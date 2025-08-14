@@ -2,7 +2,12 @@ program MKOTaskManager;
 
 uses
   Vcl.Forms,
-  uMain in 'Common\uMain.pas' {fmMain};
+  uMain in 'Common\uMain.pas' {fmMain},
+  uConsts in 'Common\uConsts.pas',
+  uCommon in 'Common\uCommon.pas',
+  uLibSupport in 'Utils\uLibSupport.pas',
+  uUtils in 'Utils\uUtils.pas',
+  uFileExplorer in '..\..\MKOCommon\Utils\uFileExplorer.pas';
 
 {$R *.res}
 
