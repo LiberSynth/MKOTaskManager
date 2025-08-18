@@ -7,7 +7,9 @@ uses
   uCommon in 'Common\uCommon.pas',
   uLibSupport in 'Utils\uLibSupport.pas',
   uUtils in 'Utils\uUtils.pas',
-  uFileExplorer in '..\..\MKOCommon\Utils\uFileExplorer.pas';
+  uFileExplorer in '..\..\MKOCommon\Utils\uFileExplorer.pas',
+  uInterfaces in '..\..\MKOCommon\TaskManager\uInterfaces.pas',
+  uTypes in 'Common\uTypes.pas';
 
 {$R *.res}
 

@@ -107,6 +107,7 @@
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Locale>1033</VerInfo_Locale>
+        <DCC_ExeOutput>..\..\_out\$(Platform)\$(Config)</DCC_ExeOutput>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
@@ -136,6 +137,8 @@
         <DCCReference Include="Utils\uLibSupport.pas"/>
         <DCCReference Include="Utils\uUtils.pas"/>
         <DCCReference Include="..\..\MKOCommon\Utils\uFileExplorer.pas"/>
+        <DCCReference Include="..\..\MKOCommon\TaskManager\uInterfaces.pas"/>
+        <DCCReference Include="Common\uTypes.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -162,7 +165,7 @@
                 </Excluded_Packages>
             </Delphi.Personality>
             <Deployment Version="5">
-                <DeployFile LocalName="..\..\_exe\Win32\Debug\MKOTaskManager.exe" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="..\..\_out\Win32\Debug\MKOTaskManager.exe" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>MKOTaskManager.exe</RemoteName>
                         <Overwrite>true</Overwrite>

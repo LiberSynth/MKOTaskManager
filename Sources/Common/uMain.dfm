@@ -34,7 +34,7 @@ object fmMain: TfmMain
       end
       item
         Column = 0
-        Control = pTaskTypes
+        Control = pTasks
         Row = 0
       end>
     RowCollection = <
@@ -56,7 +56,7 @@ object fmMain: TfmMain
       ControlCollection = <
         item
           Column = 0
-          Control = pTasks
+          Control = pRunning
           Row = 0
         end
         item
@@ -72,7 +72,7 @@ object fmMain: TfmMain
           Value = 50.000000000000000000
         end>
       TabOrder = 0
-      object pTasks: TPanel
+      object pRunning: TPanel
         Left = 0
         Top = 0
         Width = 416
@@ -80,14 +80,14 @@ object fmMain: TfmMain
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
-        object lTasks: TLabel
+        object lRunning: TLabel
           Left = 4
           Top = 4
-          Width = 39
+          Width = 70
           Height = 15
-          Caption = #1047#1072#1076#1072#1095#1080
+          Caption = #1042#1099#1087#1086#1083#1085#1077#1085#1080#1077
         end
-        object lvTasks: TListView
+        object lvRunning: TListView
           AlignWithMargins = True
           Left = 0
           Top = 25
@@ -133,7 +133,7 @@ object fmMain: TfmMain
         end
       end
     end
-    object pTaskTypes: TPanel
+    object pTasks: TPanel
       Left = 0
       Top = 0
       Width = 208
@@ -141,14 +141,14 @@ object fmMain: TfmMain
       Align = alClient
       BevelOuter = bvNone
       TabOrder = 1
-      object lTaskTypes: TLabel
+      object lTasks: TLabel
         Left = 4
         Top = 4
-        Width = 62
+        Width = 39
         Height = 15
-        Caption = #1058#1080#1087#1099' '#1079#1072#1076#1072#1095
+        Caption = #1047#1072#1076#1072#1095#1080
       end
-      object lvTaskTypes: TListView
+      object sgTasks: TStringGrid
         AlignWithMargins = True
         Left = 0
         Top = 25
@@ -159,7 +159,12 @@ object fmMain: TfmMain
         Margins.Right = 0
         Margins.Bottom = 0
         Align = alClient
-        Columns = <>
+        ColCount = 2
+        DefaultRowHeight = 20
+        FixedCols = 0
+        RowCount = 2
+        ParentShowHint = False
+        ShowHint = False
         TabOrder = 0
       end
     end
