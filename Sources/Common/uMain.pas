@@ -4,14 +4,16 @@ interface
 
 uses
   { VCL }
-  System.Classes, Vcl.Forms, System.Types, Vcl.Controls, Vcl.ComCtrls,
-  Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.Grids, System.Math,
+  System.Classes, Vcl.Forms, System.Types, Vcl.Controls, Vcl.ComCtrls, Vcl.StdCtrls,
+  Vcl.ExtCtrls, Vcl.Grids, System.Math, Vcl.Menus, System.SysUtils,
   { TM }
-  uConsts, uCommon, uLibSupport, uInterfaces;
+  uConsts, uCommon, uLibSupport, uInterfaces, uTypes, uGetTextForm, uUtils;
 
 type
 
-  {TODO -oVasilevSM : —делать подсказку на €чейках, к которые не поместилс€ текст. }
+  {TODO 1 -oVasilevSM : —делать подсказку на €чейках, к которые не поместилс€ текст. }
+  {TODO 1 -oVasilevSM : √ор€чие клавиши должны работать всегда, а не только когда контрол с менюхой в фокусе. }
+  {TODO 1 -oVasilevSM : ѕроверить на утечки. }
   TfmMain = class(TForm)
 
     pCommon: TGridPanel;
@@ -22,18 +24,23 @@ type
 
     lTasks: TLabel;
     lRunning: TLabel;
-    lvRunning: TListView;
     lConsole: TLabel;
-    lvConsole: TListView;
 
     sgTasks: TStringGrid;
+    sgRunning: TStringGrid;
+    mConsole: TMemo;
+
+    pmTasks: TPopupMenu;
+    miStart: TMenuItem;
 
     procedure FormCreate(Sender: TObject);
+    procedure miStartClick(Sender: TObject);
 
   strict private
 
     procedure AdjustSizes;
     procedure FillTasks;
+    procedure StartTask;
 
   end;
 
@@ -68,10 +75,12 @@ begin
       for MKOTask in MKOLibrary.Tasks do
       begin
 
-        Cells[0, RecNo + 1] := MKOTask.Caption;
-        Cells[1, RecNo + 1] := MKOTask.Description;
-
         Inc(RecNo);
+
+        Objects[0, RecNo] := MKOTask;
+
+        Cells[0, RecNo] := MKOTask.Intf.Caption;
+        Cells[1, RecNo] := MKOTask.Intf.Description;
 
       end;
 
@@ -85,6 +94,44 @@ begin
   AdjustSizes;
   TaskServices.LoadLibraries;
   FillTasks;
+
+end;
+
+procedure TfmMain.miStartClick(Sender: TObject);
+begin
+  StartTask;
+end;
+
+procedure TfmMain.StartTask;
+var
+  MKOTask: TObject;
+  Params: String;
+begin
+
+  with sgTasks do
+    MKOTask := Objects[0, Row];
+
+  if not (MKOTask is TMKOTask) then
+    raise EMKOTMException.Create('The object associated with this list item is not TMKOTask.');
+
+  with TMKOTask(MKOTask).Intf do
+  begin
+
+    if InputText(
+
+        SC_GET_TASK_PARAMS_FORM_CAPTION,
+        Format(SC_GET_TASK_PARAMS_FORM_TEXT, [ParamsHelpText]),
+        Params
+
+    ) then
+    begin
+
+      ValidateParams(Params);
+      Start(Params);
+
+    end;
+
+  end;
 
 end;
 

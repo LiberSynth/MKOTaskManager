@@ -138,7 +138,12 @@
         <DCCReference Include="Utils\uUtils.pas"/>
         <DCCReference Include="..\..\MKOCommon\Utils\uFileExplorer.pas"/>
         <DCCReference Include="..\..\MKOCommon\TaskManager\uInterfaces.pas"/>
-        <DCCReference Include="Common\uTypes.pas"/>
+        <DCCReference Include="..\..\MKOCommon\TaskManager\uTypes.pas"/>
+        <DCCReference Include="..\..\MKOCommon\Utils\uGetTextForm.pas">
+            <Form>fmGetTextForm</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
+        <DCCReference Include="..\..\MKOCommon\Utils\Common.uConsts.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

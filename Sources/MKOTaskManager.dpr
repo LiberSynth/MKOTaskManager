@@ -9,7 +9,9 @@ uses
   uUtils in 'Utils\uUtils.pas',
   uFileExplorer in '..\..\MKOCommon\Utils\uFileExplorer.pas',
   uInterfaces in '..\..\MKOCommon\TaskManager\uInterfaces.pas',
-  uTypes in 'Common\uTypes.pas';
+  uTypes in '..\..\MKOCommon\TaskManager\uTypes.pas',
+  uGetTextForm in '..\..\MKOCommon\Utils\uGetTextForm.pas' {fmGetTextForm},
+  Common.uConsts in '..\..\MKOCommon\Utils\Common.uConsts.pas';
 
 {$R *.res}
 

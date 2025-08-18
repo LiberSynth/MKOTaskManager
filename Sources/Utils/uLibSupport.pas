@@ -16,25 +16,13 @@ type
 
   strict private
 
-    FName: WideString;
-    FCaption: WideString;
-    FDescription: WideString;
-
-  private
-
-    constructor Create(
-
-        const _Name: WideString;
-        const _Caption: WideString;
-        const _Description: WideString
-
-    );
+    FIntf: IMKOTask;
 
   public
 
-    property Name: WideString read FName;
-    property Caption: WideString read FCaption;
-    property Description: WideString read FDescription;
+    constructor Create(const _Intf: IMKOTask); reintroduce;
+
+    property Intf: IMKOTask read FIntf;
 
   end;
 
@@ -48,13 +36,7 @@ type
     FTasks: TMKOTaskList;
 
     { IMKOTaskLibrary }
-    procedure RegisterTask(
-
-        const _Name: WideString;
-        const _Caption: WideString;
-        const _Description: WideString
-
-    ); safecall;
+    procedure RegisterTask(_MKOTask: IMKOTask); safecall;
 
     property Tasks: TMKOTaskList read FTasks;
 
@@ -148,13 +130,8 @@ end;
 
 constructor TMKOTask.Create;
 begin
-
   inherited Create;
-
-  FName        := _Name;
-  FCaption     := _Caption;
-  FDescription := _Description;
-
+  FIntf := _Intf;
 end;
 
 { TMKOLibraryIntf }
@@ -165,9 +142,12 @@ begin
   FTasks := _Tasks;
 end;
 
-procedure TMKOLibraryIntf.RegisterTask(const _Name, _Caption, _Description: WideString);
+procedure TMKOLibraryIntf.RegisterTask(_MKOTask: IMKOTask);
 begin
-  Tasks.Add(TMKOTask.Create(_Name, _Caption, _Description));
+
+  with _MKOTask do
+    Tasks.Add(TMKOTask.Create(_MKOTask));
+
 end;
 
 { TMKOLibrary }

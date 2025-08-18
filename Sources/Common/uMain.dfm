@@ -71,7 +71,7 @@ object fmMain: TfmMain
         item
           Value = 50.000000000000000000
         end>
-      TabOrder = 0
+      TabOrder = 1
       object pRunning: TPanel
         Left = 0
         Top = 0
@@ -80,6 +80,7 @@ object fmMain: TfmMain
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
+        ExplicitTop = -2
         object lRunning: TLabel
           Left = 4
           Top = 4
@@ -87,7 +88,7 @@ object fmMain: TfmMain
           Height = 15
           Caption = #1042#1099#1087#1086#1083#1085#1077#1085#1080#1077
         end
-        object lvRunning: TListView
+        object sgRunning: TStringGrid
           AlignWithMargins = True
           Left = 0
           Top = 25
@@ -98,8 +99,16 @@ object fmMain: TfmMain
           Margins.Right = 0
           Margins.Bottom = 0
           Align = alClient
-          Columns = <>
+          ColCount = 2
+          DefaultRowHeight = 20
+          FixedCols = 0
+          RowCount = 2
+          Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goColSizing, goRowSelect, goFixedRowDefAlign]
+          ParentShowHint = False
+          ShowHint = False
           TabOrder = 0
+          ExplicitTop = 100
+          ExplicitHeight = 120
         end
       end
       object pConsole: TPanel
@@ -117,7 +126,7 @@ object fmMain: TfmMain
           Height = 15
           Caption = #1050#1086#1085#1089#1086#1083#1100
         end
-        object lvConsole: TListView
+        object mConsole: TMemo
           AlignWithMargins = True
           Left = 0
           Top = 25
@@ -128,8 +137,9 @@ object fmMain: TfmMain
           Margins.Right = 0
           Margins.Bottom = 0
           Align = alClient
-          Columns = <>
           TabOrder = 0
+          ExplicitTop = 84
+          ExplicitHeight = 137
         end
       end
     end
@@ -140,7 +150,7 @@ object fmMain: TfmMain
       Height = 441
       Align = alClient
       BevelOuter = bvNone
-      TabOrder = 1
+      TabOrder = 0
       object lTasks: TLabel
         Left = 4
         Top = 4
@@ -163,10 +173,23 @@ object fmMain: TfmMain
         DefaultRowHeight = 20
         FixedCols = 0
         RowCount = 2
+        Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goColSizing, goRowSelect, goFixedRowDefAlign]
         ParentShowHint = False
+        PopupMenu = pmTasks
         ShowHint = False
         TabOrder = 0
+        ExplicitTop = 204
+        ExplicitHeight = 237
       end
+    end
+  end
+  object pmTasks: TPopupMenu
+    Left = 16
+    Top = 76
+    object miStart: TMenuItem
+      Caption = #1047#1072#1087#1091#1089#1090#1080#1090#1100
+      ShortCut = 116
+      OnClick = miStartClick
     end
   end
 end
