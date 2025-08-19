@@ -11,7 +11,10 @@ uses
   uInterfaces in '..\..\MKOCommon\TaskManager\uInterfaces.pas',
   uTypes in '..\..\MKOCommon\TaskManager\uTypes.pas',
   uGetTextForm in '..\..\MKOCommon\Utils\uGetTextForm.pas' {fmGetTextForm},
-  Common.uConsts in '..\..\MKOCommon\Utils\Common.uConsts.pas';
+  Common.uConsts in '..\..\MKOCommon\Utils\Common.uConsts.pas',
+  uThread in 'Common\uThread.pas',
+  Common.uUtils in '..\..\MKOCommon\Utils\Common.uUtils.pas',
+  uStringGridHelper in '..\..\MKOCommon\Utils\uStringGridHelper.pas';
 
 {$R *.res}
 

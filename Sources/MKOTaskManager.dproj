@@ -144,6 +144,9 @@
             <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="..\..\MKOCommon\Utils\Common.uConsts.pas"/>
+        <DCCReference Include="Common\uThread.pas"/>
+        <DCCReference Include="..\..\MKOCommon\Utils\Common.uUtils.pas"/>
+        <DCCReference Include="..\..\MKOCommon\Utils\uStringGridHelper.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

@@ -80,7 +80,6 @@ object fmMain: TfmMain
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
-        ExplicitTop = -2
         object lRunning: TLabel
           Left = 4
           Top = 4
@@ -88,7 +87,7 @@ object fmMain: TfmMain
           Height = 15
           Caption = #1042#1099#1087#1086#1083#1085#1077#1085#1080#1077
         end
-        object sgRunning: TStringGrid
+        object sgTaskItems: TStringGrid
           AlignWithMargins = True
           Left = 0
           Top = 25
@@ -99,16 +98,15 @@ object fmMain: TfmMain
           Margins.Right = 0
           Margins.Bottom = 0
           Align = alClient
-          ColCount = 2
+          ColCount = 4
           DefaultRowHeight = 20
           FixedCols = 0
           RowCount = 2
           Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goColSizing, goRowSelect, goFixedRowDefAlign]
           ParentShowHint = False
+          PopupMenu = pmTaskItems
           ShowHint = False
           TabOrder = 0
-          ExplicitTop = 100
-          ExplicitHeight = 120
         end
       end
       object pConsole: TPanel
@@ -138,8 +136,6 @@ object fmMain: TfmMain
           Margins.Bottom = 0
           Align = alClient
           TabOrder = 0
-          ExplicitTop = 84
-          ExplicitHeight = 137
         end
       end
     end
@@ -178,8 +174,7 @@ object fmMain: TfmMain
         PopupMenu = pmTasks
         ShowHint = False
         TabOrder = 0
-        ExplicitTop = 204
-        ExplicitHeight = 237
+        OnDblClick = sgTasksDblClick
       end
     end
   end
@@ -188,8 +183,20 @@ object fmMain: TfmMain
     Top = 76
     object miStart: TMenuItem
       Caption = #1047#1072#1087#1091#1089#1090#1080#1090#1100
+      Default = True
       ShortCut = 116
       OnClick = miStartClick
+    end
+  end
+  object pmTaskItems: TPopupMenu
+    OnPopup = pmTaskItemsPopup
+    Left = 228
+    Top = 80
+    object miTerminate: TMenuItem
+      Caption = #1055#1088#1077#1088#1074#1072#1090#1100
+      Default = True
+      ShortCut = 113
+      OnClick = miTerminateClick
     end
   end
 end

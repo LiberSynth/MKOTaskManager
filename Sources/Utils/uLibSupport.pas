@@ -4,13 +4,70 @@ interface
 
 uses
   { VCL }
-  System.SysUtils, Generics.Collections, Winapi.Windows,
+  System.SysUtils, Generics.Collections, Winapi.Windows, System.SyncObjs,
   { Common }
   uInterfaces, uFileExplorer,
   { TM }
-  uUtils, uTypes;
+  uUtils, uTypes, uThread, uConsts;
 
 type
+
+  TTaskInstanceState = (tsCreated, tsProcessing, tsFinished, tsCanceled, tsError);
+
+  TTaskInstanceStateHelper = record helper for TTaskInstanceState
+
+  public
+
+    function ToStr: String;
+
+  end;
+
+  TMKOTask = class;
+
+  TMKOTaskInstance = class
+
+  strict private
+
+    FTask: TMKOTask;
+    FIntf: IMKOTaskInstance;
+    FThread: TMKOTaskThread;
+    FParams: String;
+    FState: TTaskInstanceState;
+    FDate: TDateTime;
+    FStateLocker: TCriticalSection;
+
+    function GetState: TTaskInstanceState;
+    procedure SetState(const _Value: TTaskInstanceState);
+
+    procedure CreateThread;
+    procedure ThreadOnExecute;
+    procedure ThreadOnTerminate(_Sender: TObject);
+
+    property Intf: IMKOTaskInstance read FIntf;
+    property Thread: TMKOTaskThread read FThread;
+    property StateLocker: TCriticalSection read FStateLocker;
+
+  private
+
+    constructor Create(
+
+        _MKOTask: TMKOTask;
+        const _Params: String
+
+    ); reintroduce;
+
+  public
+
+    destructor Destroy; override;
+
+    procedure Terminate;
+
+    property Task: TMKOTask read FTask;
+    property Params: String read FParams;
+    property State: TTaskInstanceState read GetState write SetState;
+    property Date: TDateTime read FDate;
+
+  end;
 
   TMKOTask = class
 
@@ -21,6 +78,8 @@ type
   public
 
     constructor Create(const _Intf: IMKOTask); reintroduce;
+
+    procedure StartTask(const _Params: String);
 
     property Intf: IMKOTask read FIntf;
 
@@ -80,7 +139,13 @@ type
 
   TMKOLibraryList = class(TObjectList<TMKOLibrary>);
 
+  TMKOTaskInstanceList = class(TList<TMKOTaskInstance>);
+
   TMKOTaskServices = class
+
+  strict private type
+
+    TTaskInstancesChangedProc = procedure of object;
 
   strict private
 
@@ -92,6 +157,8 @@ type
   strict private
 
     FLibraries: TMKOLibraryList;
+    FTaskInstance: TMKOTaskInstanceList;
+    FOnTaskInstancesChanged: TTaskInstancesChangedProc;
 
     function GetTaskCount: Integer;
 
@@ -106,6 +173,9 @@ type
 
     procedure FinalizeLibraries;
 
+    procedure AddTaskInstance(_TaskInstance: TMKOTaskInstance);
+    procedure DoOnTaskInstancesChanged;
+
   public
 
     destructor Destroy; override;
@@ -113,7 +183,9 @@ type
     procedure LoadLibraries;
 
     property Libraries: TMKOLibraryList read FLibraries;
+    property TaskInstances: TMKOTaskInstanceList read FTaskInstance;
     property TaskCount: Integer read GetTaskCount;
+    property OnTaskInstancesChanged: TTaskInstancesChangedProc read FOnTaskInstancesChanged write FOnTaskInstancesChanged;
 
   end;
 
@@ -126,12 +198,108 @@ begin
   Result := TMKOTaskServices.Instance;
 end;
 
+{ TMKOTaskInstance }
+
+constructor TMKOTaskInstance.Create;
+begin
+
+  inherited Create;
+
+  FTask   := _MKOTask;
+  FParams := _Params;
+  FDate   := Now;
+
+  FStateLocker := TCriticalSection.Create;
+  CreateThread;
+
+end;
+
+procedure TMKOTaskInstance.CreateThread;
+begin
+
+  FIntf := Task.Intf.StartTask(Params);
+  FThread := TMKOTaskThread.Create(Intf);
+
+  FThread.OnExecute := ThreadOnExecute;
+  FThread.OnTerminate := ThreadOnTerminate;
+
+  FThread.Start;
+
+end;
+
+destructor TMKOTaskInstance.Destroy;
+begin
+  FreeAndNil(FStateLocker);
+  inherited Destroy;
+end;
+
+function TMKOTaskInstance.GetState: TTaskInstanceState;
+begin
+
+  StateLocker.Acquire;
+  try
+
+    Result := FState;
+
+  finally
+    StateLocker.Release;
+  end;
+
+end;
+
+procedure TMKOTaskInstance.SetState(const _Value: TTaskInstanceState);
+begin
+
+  StateLocker.Acquire;
+  try
+
+    if FState <> _Value then
+    begin
+
+      FState := _Value;
+      {TODO 1 -oVasilevSM : Где-то здесь надо триггернуть DataChanged листа с параметром "я". }
+
+    end;
+
+  finally
+    StateLocker.Release;
+  end;
+
+end;
+
+procedure TMKOTaskInstance.Terminate;
+begin
+  Intf.Terminate;
+  Thread.Terminate;
+end;
+
+procedure TMKOTaskInstance.ThreadOnExecute;
+begin
+  State := tsProcessing;
+end;
+
+procedure TMKOTaskInstance.ThreadOnTerminate(_Sender: TObject);
+begin
+  State := tsCanceled;
+end;
+
 { TMKOTask }
 
 constructor TMKOTask.Create;
 begin
   inherited Create;
   FIntf := _Intf;
+end;
+
+procedure TMKOTask.StartTask(const _Params: String);
+var
+  Params: WideString;
+begin
+
+  Params := _Params;
+  Intf.ValidateParams(Params);
+  TaskServices.AddTaskInstance(TMKOTaskInstance.Create(Self, Params));
+
 end;
 
 { TMKOLibraryIntf }
@@ -214,16 +382,36 @@ end;
 
 { TMKOTaskServices }
 
+procedure TMKOTaskServices.AddTaskInstance(_TaskInstance: TMKOTaskInstance);
+begin
+  TaskInstances.Add(_TaskInstance);
+  DoOnTaskInstancesChanged;
+end;
+
 constructor TMKOTaskServices.Create;
 begin
+
   inherited Create;
+
   FLibraries := TMKOLibraryList.Create;
+  FTaskInstance := TMKOTaskInstanceList.Create;
+
 end;
 
 destructor TMKOTaskServices.Destroy;
 begin
+
+  FreeAndNil(FTaskInstance);
   FreeAndNil(FLibraries);
+
   inherited Destroy;
+
+end;
+
+procedure TMKOTaskServices.DoOnTaskInstancesChanged;
+begin
+  if Assigned(FOnTaskInstancesChanged) then
+    OnTaskInstancesChanged;
 end;
 
 function TMKOTaskServices.GetTaskCount: Integer;
@@ -302,6 +490,25 @@ begin
       end
 
   );
+
+end;
+
+{ TTaskInstanceStateHelper }
+
+function TTaskInstanceStateHelper.ToStr: String;
+begin
+
+  case Self of
+
+    tsCreated:    Result := SC_TASK_ITEM_STATE_CREATED_CAPTION;
+    tsProcessing: Result := SC_TASK_ITEM_STATE_PROCESSING_CAPTION;
+    tsFinished:   Result := SC_TASK_ITEM_STATE_FINISHED_CAPTION;
+    tsCanceled:   Result := SC_TASK_ITEM_STATE_CANCELED_CAPTION;
+    tsError:      Result := SC_TASK_ITEM_STATE_ERROR_CAPTION
+
+  else
+    raise EMKOTMException.Create('Complete this method.');
+  end;
 
 end;
 

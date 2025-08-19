@@ -5,7 +5,7 @@ interface
 
 uses
   { VCL }
-  System.SysUtils, System.Classes;
+  System.SysUtils;
 
 function ExeDir: String;
 
