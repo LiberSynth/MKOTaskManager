@@ -10,18 +10,25 @@ uses
 
 type
 
-  TMKOTaskThreadOnExecute = procedure of object;
-
   TMKOTaskThread = class(TThread)
+
+  strict private type
+
+    TBeforeExecuteEvent = procedure of object;
+    TAfterExecuteEvent = procedure(_ErrorOccured: Boolean) of object;
 
   strict private
 
     FIntf: IMKOTaskInstance;
-    FOnExecute: TMKOTaskThreadOnExecute;
+    FWiteOutIntf: IMKOTaskWiteOut;
+    FBeforeExecute: TBeforeExecuteEvent;
+    FAfterExecute: TAfterExecuteEvent;
 
-    procedure DoOnExecute;
+    procedure DoBeforeExecute;
+    procedure DoAfterExecute(_ErrorOccured: Boolean);
 
     property Intf: IMKOTaskInstance read FIntf;
+    property WiteOutIntf: IMKOTaskWiteOut read FWiteOutIntf;
 
   protected
 
@@ -29,9 +36,10 @@ type
 
   public
 
-    constructor Create(_Intf: IMKOTaskInstance); reintroduce;
+    constructor Create(_Intf: IMKOTaskInstance; _WiteOutIntf: IMKOTaskWiteOut); reintroduce;
 
-    property OnExecute: TMKOTaskThreadOnExecute read FOnExecute write FOnExecute;
+    property BeforeExecute: TBeforeExecuteEvent read FBeforeExecute write FBeforeExecute;
+    property AfterExecute: TAfterExecuteEvent read FAfterExecute write FAfterExecute;
 
   end;
 
@@ -41,21 +49,47 @@ implementation
 
 constructor TMKOTaskThread.Create;
 begin
+
   inherited Create(True);
+
   FIntf := _Intf;
+  FWiteOutIntf := _WiteOutIntf;
+
 end;
 
-procedure TMKOTaskThread.DoOnExecute;
+procedure TMKOTaskThread.DoAfterExecute(_ErrorOccured: Boolean);
 begin
-  if Assigned(FOnExecute) then
-    OnExecute;
+  if Assigned(FAfterExecute) then
+    AfterExecute(_ErrorOccured);
+end;
+
+procedure TMKOTaskThread.DoBeforeExecute;
+begin
+  if Assigned(FBeforeExecute) then
+    BeforeExecute;
 end;
 
 procedure TMKOTaskThread.Execute;
+var
+  ErrorOccured: Boolean;
 begin
 
-  DoOnExecute;
-  Intf.Execute;
+  ErrorOccured := False;
+
+  DoBeforeExecute;
+  try
+
+    try
+
+      Intf.Execute(WiteOutIntf);
+
+    except
+      ErrorOccured := True;
+    end;
+
+  finally
+    DoAfterExecute(ErrorOccured);
+  end;
 
 end;
 
