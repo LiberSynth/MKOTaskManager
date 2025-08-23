@@ -9,7 +9,7 @@ uses
   { Common }
   uInterfaces, uFileExplorer,
   { TM }
-  uUtils, uTypes, uThread, uConsts;
+  uUtils, uTypes, uThread, uConsts, Common.uUtils;
 
 type
 
@@ -30,14 +30,14 @@ type
 
   strict private type
 
-    TWiteOutIntf = class(TInterfacedObject, IMKOTaskWiteOut)
+    TOutputIntf = class(TInterfacedObject, IMKOTaskOutput)
 
     strict private
 
       FTaskInstance: TMKOTaskInstance;
 
-      { IMKOTaskWiteOut }
-      procedure WriteOut(const _Value: WideString); safecall;
+      { IMKOTaskOutput }
+      procedure WriteOut(const _Value: WideString; _Progress: Integer); safecall;
 
       property TaskInstance: TMKOTaskInstance read FTaskInstance;
 
@@ -52,11 +52,13 @@ type
     FTask: TMKOTask;
     FIntf: IMKOTaskInstance;
     FThread: TMKOTaskThread;
-    FParams: String;
+    FParams: IMKOTaskParams;
     FWndHandle: HWND;
     FState: TTaskState;
     FData: TStringList;
+    FProgress: Integer;
     FDate: TDateTime;
+    FLastPostPoint: Cardinal;
     FStateLocker: TCriticalSection;
     FDataLocker: TCriticalSection;
 
@@ -67,7 +69,7 @@ type
     procedure ThreadBeforeExecute;
     procedure ThreadAfterExecute(_ErrorOccured: Boolean);
     procedure ThreadOnTerminate(_Sender: TObject);
-    procedure DoChanged;
+    procedure DoChanged(_Assured: Boolean = False);
 
     property Intf: IMKOTaskInstance read FIntf;
     property Thread: TMKOTaskThread read FThread;
@@ -75,18 +77,22 @@ type
     property DataLocker: TCriticalSection read FDataLocker;
     property WndHandle: HWND read FWndHandle;
     property Data: TStringList read FData write FData;
+    property LastPostPoint: Cardinal read FLastPostPoint write FLastPostPoint;
 
   private
 
     constructor Create(
 
         _MKOTask: TMKOTask;
-        const _Params: String;
+        const _Params: IMKOTaskParams;
         _WndHandle: HWND
 
     ); reintroduce;
 
-    procedure WriteOut(const _Value: WideString);
+    { Многопоточный метод }
+    procedure WriteOut(const _Value: WideString; _Progress: Integer; _Assured: Boolean = False);
+
+    property Progress: Integer read FProgress;
 
   public
 
@@ -94,19 +100,44 @@ type
 
     procedure Terminate;
 
-    { Однопоточные свойства }
     property Task: TMKOTask read FTask;
-    property Params: String read FParams;
+    property Params: IMKOTaskParams read FParams;
     property Date: TDateTime read FDate;
 
-    { Многопоточные методы и свойства }
-    procedure PullData(_Target: TStrings);
+    { Многопоточный метод }
+    procedure PullData(_Target: TStrings; var _Progress: Integer);
 
+    { Многопоточное свойство }
     property State: TTaskState read GetState write SetState;
 
   end;
 
   TMKOTaskInstanceList = class(TList<TMKOTaskInstance>);
+
+  TMKOTaskParams = class(TInterfacedObject, IMKOTaskParams)
+
+  strict private
+
+    FList: TStringList;
+    FErrorMessage: String;
+
+    { IMKOTaskParams }
+    function GetItems(_Index: Integer): WideString; safecall;
+    procedure SetItems(_Index: Integer; const _Value: WideString); safecall;
+    function GetCount: Integer; safecall;
+    function GetErrorMessage: WideString; safecall;
+    procedure SetErrorMessage(const _Value: WideString); safecall;
+    procedure Delete(_Index: Integer); safecall;
+    function ToString: WideString; reintroduce; safecall;
+
+    property List: TStringList read FList;
+
+  public
+
+    constructor Create(const _Params: String); reintroduce;
+    destructor Destroy; override;
+
+  end;
 
   TMKOTask = class
 
@@ -114,18 +145,26 @@ type
 
     FIntf: IMKOTask;
 
+    procedure TrimParams(const _Params: IMKOTaskParams);
+
   public
 
     constructor Create(const _Intf: IMKOTask); reintroduce;
 
-    function StartTask(const _Params: String): TMKOTaskInstance;
+    function ValidateParams(const _Params: IMKOTaskParams): Boolean;
+    function StartTask(const _Params: IMKOTaskParams): TMKOTaskInstance;
 
     property Intf: IMKOTask read FIntf;
 
   end;
 
-  {TODO 1 -oVasilyevSM: Проконтролировать уникальность поля Name. (Если понадобится поле Name вообще.) }
-  TMKOTaskList = class(TObjectList<TMKOTask>);
+  TMKOTaskList = class(TObjectList<TMKOTask>)
+
+  private
+
+    function Contains(const _TaskName: String): Boolean; overload;
+
+  end;
 
   TMKOLibraryIntf = class(TInterfacedObject, IMKOTaskLibrary)
 
@@ -219,7 +258,7 @@ type
     procedure FinalizeLibraries;
     procedure FinalizeTaskInstances;
 
-    function AddTaskInstance(_MKOTask: TMKOTask; const _Params: String): TMKOTaskInstance;
+    function AddTaskInstance(_MKOTask: TMKOTask; const _Params: IMKOTaskParams): TMKOTaskInstance;
 
   public
 
@@ -265,33 +304,33 @@ end;
 
 
 function TTaskStateHelper.ToString: String;
+const
+
+  AA_MAP: array[TTaskState] of String = (
+
+    SC_TASK_STATE_CREATED_CAPTION,
+    SC_TASK_STATE_PROCESSING_CAPTION,
+    SC_TASK_STATE_FINISHED_CAPTION,
+    SC_TASK_STATE_CANCELED_CAPTION,
+    SC_TASK_STATE_ERROR_CAPTION
+
+  );
+
 begin
-
-  case Self of
-
-    tsCreated:    Result := SC_TASK_STATE_CREATED_CAPTION;
-    tsProcessing: Result := SC_TASK_STATE_PROCESSING_CAPTION;
-    tsFinished:   Result := SC_TASK_STATE_FINISHED_CAPTION;
-    tsCanceled:   Result := SC_TASK_STATE_CANCELED_CAPTION;
-    tsError:      Result := SC_TASK_STATE_ERROR_CAPTION
-
-  else
-    raise EMKOTMException.Create('Complete this method.');
-  end;
-
+  Result := AA_MAP[Self];
 end;
 
-{ TMKOTaskInstance.TWiteOutIntf }
+{ TMKOTaskInstance.TOutputIntf }
 
-constructor TMKOTaskInstance.TWiteOutIntf.Create(_TaskInstance: TMKOTaskInstance);
+constructor TMKOTaskInstance.TOutputIntf.Create(_TaskInstance: TMKOTaskInstance);
 begin
   inherited Create;
   FTaskInstance := _TaskInstance;
 end;
 
-procedure TMKOTaskInstance.TWiteOutIntf.WriteOut(const _Value: WideString);
+procedure TMKOTaskInstance.TOutputIntf.WriteOut(const _Value: WideString; _Progress: Integer);
 begin
-  TaskInstance.WriteOut(_Value);
+  TaskInstance.WriteOut(_Value, _Progress);
 end;
 
 { TMKOTaskInstance }
@@ -301,10 +340,10 @@ begin
 
   inherited Create;
 
-  FTask   := _MKOTask;
+  FTask := _MKOTask;
   FParams := _Params;
   FWndHandle := _WndHandle;
-  FDate   := Now;
+  FDate := Now;
 
   FStateLocker := TCriticalSection.Create;
   FDataLocker := TCriticalSection.Create;
@@ -320,7 +359,7 @@ procedure TMKOTaskInstance.CreateThread;
 begin
 
   FIntf := Task.Intf.StartTask(Params);
-  FThread := TMKOTaskThread.Create(Intf, TWiteOutIntf.Create(Self));
+  FThread := TMKOTaskThread.Create(Intf, TOutputIntf.Create(Self));
 
   Thread.BeforeExecute := ThreadBeforeExecute;
   Thread.AfterExecute := ThreadAfterExecute;
@@ -341,9 +380,22 @@ begin
 
 end;
 
-procedure TMKOTaskInstance.DoChanged;
+procedure TMKOTaskInstance.DoChanged(_Assured: Boolean);
+var
+  TC: Cardinal;
 begin
-  PostMessage(WndHandle, WM_TASK_INSTANCE_CHANGED, WPARAM(Self), 0)
+
+  TC := GetTickCount;
+
+  { Отправляем сообщение не слишком часто. }
+  if (TC - LastPostPoint > 100) or _Assured then
+  begin
+
+    PostMessage(WndHandle, WM_TASK_INSTANCE_CHANGED, WPARAM(Self), 0);
+    LastPostPoint := TC;
+
+  end;
+
 end;
 
 function TMKOTaskInstance.GetState: TTaskState;
@@ -360,13 +412,18 @@ begin
 
 end;
 
-procedure TMKOTaskInstance.PullData(_Target: TStrings);
+procedure TMKOTaskInstance.PullData(_Target: TStrings; var _Progress: Integer);
+var
+  i: Integer;
 begin
 
   DataLocker.Acquire;
   try
 
-    _Target.Assign(Data);
+    for i := _Target.Count to Data.Count - 1 do
+      _Target.Add(Data[i]);
+
+    _Progress := Progress;
 
   finally
     DataLocker.Release;
@@ -391,15 +448,16 @@ begin
     StateLocker.Release;
   end;
 
-  WriteOut(State.Report);
+  WriteOut(State.Report, -1, True);
 
 end;
 
 procedure TMKOTaskInstance.Terminate;
 begin
 
-  Intf.Terminate;
+  State := tsCanceled;
 
+  Intf.Terminate;
   Thread.Terminate;
   Thread.WaitFor;
 
@@ -410,8 +468,10 @@ const
   AC_MAP: array[Boolean] of TTaskState = (tsFinished, tsError);
 begin
 
-  {TODO 1 -oVasilevSM: Убрать: }
-  Sleep(1000);
+  {$IFDEF DEBUG}
+  { Чтобы в при отладке нагладнее наблюдать за процессом. }
+  Sleep(800);
+  {$ENDIF}
   State := AC_MAP[_ErrorOccured];
 
 end;
@@ -419,8 +479,10 @@ end;
 procedure TMKOTaskInstance.ThreadBeforeExecute;
 begin
 
-  {TODO 1 -oVasilevSM: Убрать: }
-  Sleep(1000);
+  {$IFDEF DEBUG}
+  { Чтобы в при отладке нагладнее наблюдать за процессом. }
+  Sleep(800);
+  {$ENDIF}
   State := tsProcessing;
 
 end;
@@ -430,20 +492,86 @@ begin
   State := tsCanceled;
 end;
 
-procedure TMKOTaskInstance.WriteOut(const _Value: WideString);
+procedure TMKOTaskInstance.WriteOut(const _Value: WideString; _Progress: Integer; _Assured: Boolean);
 begin
 
   DataLocker.Acquire;
   try
 
-    Data.Add(_Value);
+    if Length(_Value) > 0 then
+      Data.Add(_Value);
+
+    if _Progress <> -1 then
+      FProgress := _Progress;
+
+    DoChanged(_Assured);
 
   finally
     DataLocker.Release;
   end;
 
-  DoChanged;
+end;
 
+{ TMKOTaskParams }
+
+constructor TMKOTaskParams.Create(const _Params: String);
+begin
+
+  inherited Create;
+
+  FList := TStringList.Create;
+  List.Text := _Params;
+
+end;
+
+procedure TMKOTaskParams.Delete(_Index: Integer);
+begin
+  List.Delete(_Index);
+end;
+
+destructor TMKOTaskParams.Destroy;
+begin
+  FreeAndNil(FList);
+  inherited Destroy;
+end;
+
+function TMKOTaskParams.GetItems(_Index: Integer): WideString;
+begin
+  Result := List[_Index];
+end;
+
+procedure TMKOTaskParams.SetErrorMessage(const _Value: WideString);
+begin
+  FErrorMessage := _Value;
+end;
+
+procedure TMKOTaskParams.SetItems(_Index: Integer; const _Value: WideString);
+begin
+  List[_Index] := _Value;
+end;
+
+function TMKOTaskParams.ToString: WideString;
+var
+  S: String;
+begin
+
+  Result := '';
+
+  for S in List do
+    Result := Format('%s"%s" ', [Result, S]);
+
+  CutStr(Result, 1);
+
+end;
+
+function TMKOTaskParams.GetCount: Integer;
+begin
+  Result := List.Count;
+end;
+
+function TMKOTaskParams.GetErrorMessage: WideString;
+begin
+  Result := FErrorMessage;
 end;
 
 { TMKOTask }
@@ -454,14 +582,50 @@ begin
   FIntf := _Intf;
 end;
 
-function TMKOTask.StartTask(const _Params: String): TMKOTaskInstance;
+function TMKOTask.StartTask(const _Params: IMKOTaskParams): TMKOTaskInstance;
+begin
+  TrimParams(_Params);
+  Result := TaskServices.AddTaskInstance(Self, _Params);
+end;
+
+procedure TMKOTask.TrimParams(const _Params: IMKOTaskParams);
 var
-  Params: WideString;
+  i: Integer;
+  S: String;
 begin
 
-  Params := _Params;
-  Intf.ValidateParams(Params);
-  Result := TaskServices.AddTaskInstance(Self, Params);
+  for i := _Params.Count - 1 downto 0 do
+  begin
+
+    S := _Params[i];
+    S := S.Trim;
+
+    if S.Length = 0 then
+      _Params.Delete(i)
+    else
+      _Params[i] := S;
+
+  end;
+
+end;
+
+function TMKOTask.ValidateParams(const _Params: IMKOTaskParams): Boolean;
+begin
+  Result := Intf.ValidateParams(_Params);
+end;
+
+{ TMKOTaskList }
+
+function TMKOTaskList.Contains(const _TaskName: String): Boolean;
+var
+  Item: TMKOTask;
+begin
+
+  for Item in Self do
+    if AnsiSameText(Item.Intf.Name, _TaskName) then
+      Exit(True);
+
+  Result := False;
 
 end;
 
@@ -476,8 +640,10 @@ end;
 procedure TMKOLibraryIntf.RegisterTask(_MKOTask: IMKOTask);
 begin
 
-  with _MKOTask do
-    Tasks.Add(TMKOTask.Create(_MKOTask));
+  if Tasks.Contains(_MKOTask.Name) then
+    raise EMKOTMException.CreateFmt(SC_TASK_NAME_UNIQUE_ERROR, [_MKOTask.Name]);
+
+  Tasks.Add(TMKOTask.Create(_MKOTask));
 
 end;
 
@@ -545,11 +711,11 @@ end;
 
 { TMKOTaskServices }
 
-function TMKOTaskServices.AddTaskInstance(_MKOTask: TMKOTask; const _Params: String): TMKOTaskInstance;
+function TMKOTaskServices.AddTaskInstance(_MKOTask: TMKOTask; const _Params: IMKOTaskParams): TMKOTaskInstance;
 begin
 
   Result := TMKOTaskInstance.Create(_MKOTask, _Params, WndHandle);
-  TaskInstances.Add(Result);
+  TaskInstances.Insert(0, Result);
 
   DoOnTaskInstancesChanged;
 
@@ -622,8 +788,10 @@ end;
 
 procedure TMKOTaskServices.MessageProc(var _Message: TMessage);
 begin
+
   if _Message.Msg = WM_TASK_INSTANCE_CHANGED then
     DoOnTaskInstanceChanged(TMKOTaskInstance(_Message.WParam));
+
 end;
 
 class function TMKOTaskServices.Instance: TMKOTaskServices;
@@ -696,9 +864,12 @@ begin
 
   ExploreFiles(RootPath, '*.dll',
 
-      procedure (const _File: String)
+      procedure (const _File: String; _MaskMatches: Boolean; var _Terminated: Boolean)
       begin
-        LoadLibrary(_File);
+
+        if _MaskMatches then
+          LoadLibrary(_File);
+
       end
 
   );

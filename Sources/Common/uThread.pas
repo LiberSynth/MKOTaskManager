@@ -20,7 +20,7 @@ type
   strict private
 
     FIntf: IMKOTaskInstance;
-    FWiteOutIntf: IMKOTaskWiteOut;
+    FWiteOutIntf: IMKOTaskOutput;
     FBeforeExecute: TBeforeExecuteEvent;
     FAfterExecute: TAfterExecuteEvent;
 
@@ -28,7 +28,7 @@ type
     procedure DoAfterExecute(_ErrorOccured: Boolean);
 
     property Intf: IMKOTaskInstance read FIntf;
-    property WiteOutIntf: IMKOTaskWiteOut read FWiteOutIntf;
+    property WiteOutIntf: IMKOTaskOutput read FWiteOutIntf;
 
   protected
 
@@ -36,7 +36,7 @@ type
 
   public
 
-    constructor Create(_Intf: IMKOTaskInstance; _WiteOutIntf: IMKOTaskWiteOut); reintroduce;
+    constructor Create(_Intf: IMKOTaskInstance; _WiteOutIntf: IMKOTaskOutput); reintroduce;
 
     property BeforeExecute: TBeforeExecuteEvent read FBeforeExecute write FBeforeExecute;
     property AfterExecute: TAfterExecuteEvent read FAfterExecute write FAfterExecute;
@@ -51,6 +51,8 @@ constructor TMKOTaskThread.Create;
 begin
 
   inherited Create(True);
+
+  Priority := tpIdle;
 
   FIntf := _Intf;
   FWiteOutIntf := _WiteOutIntf;

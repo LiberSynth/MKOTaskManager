@@ -10,8 +10,10 @@ object fmMain: TfmMain
   Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
+  KeyPreview = True
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
   TextHeight = 15
   object pCommon: TGridPanel
     Left = 0
@@ -108,6 +110,7 @@ object fmMain: TfmMain
           ShowHint = False
           TabOrder = 0
           OnDrawCell = sgTaskItemsDrawCell
+          OnMouseDown = sgTasksMouseDown
           OnSelectCell = sgTaskItemsSelectCell
         end
       end
@@ -131,13 +134,26 @@ object fmMain: TfmMain
           Left = 0
           Top = 25
           Width = 416
-          Height = 196
+          Height = 184
           Margins.Left = 0
           Margins.Top = 25
           Margins.Right = 0
           Margins.Bottom = 0
           Align = alClient
+          ScrollBars = ssBoth
           TabOrder = 0
+        end
+        object pbProgress: TProgressBar
+          Left = 0
+          Top = 209
+          Width = 416
+          Height = 12
+          Align = alBottom
+          DoubleBuffered = False
+          ParentDoubleBuffered = False
+          MarqueeInterval = 0
+          Step = 1
+          TabOrder = 1
         end
       end
     end
@@ -177,6 +193,7 @@ object fmMain: TfmMain
         ShowHint = False
         TabOrder = 0
         OnDblClick = sgTasksDblClick
+        OnMouseDown = sgTasksMouseDown
       end
     end
   end
