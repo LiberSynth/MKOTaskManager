@@ -140,6 +140,7 @@ object fmMain: TfmMain
           Margins.Right = 0
           Margins.Bottom = 0
           Align = alClient
+          ReadOnly = True
           ScrollBars = ssBoth
           TabOrder = 0
         end
@@ -149,10 +150,6 @@ object fmMain: TfmMain
           Width = 416
           Height = 12
           Align = alBottom
-          DoubleBuffered = False
-          ParentDoubleBuffered = False
-          MarqueeInterval = 0
-          Step = 1
           TabOrder = 1
         end
       end

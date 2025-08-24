@@ -69,7 +69,8 @@ type
     procedure ThreadBeforeExecute;
     procedure ThreadAfterExecute(_ErrorOccured: Boolean);
     procedure ThreadOnTerminate(_Sender: TObject);
-    procedure DoChanged(_Assured: Boolean = False);
+    procedure DoChanged;
+    procedure DoSendData(_Assured: Boolean);
 
     property Intf: IMKOTaskInstance read FIntf;
     property Thread: TMKOTaskThread read FThread;
@@ -221,8 +222,8 @@ type
 
   strict private type
 
-    TTaskInstancesChangedProc = procedure of object;
-    TOnTaskInstanceChanged = procedure(_Sender: TMKOTaskInstance) of object;
+    TTaskInstanceListChangedProc = procedure of object;
+    TOnTaskInstanceProc = procedure(_Instance: TMKOTaskInstance) of object;
 
   strict private
 
@@ -236,15 +237,17 @@ type
     FWndHandle: HWND;
     FLibraries: TMKOLibraryList;
     FTaskInstances: TMKOTaskInstanceList;
-    FOnTaskInstancesChanged: TTaskInstancesChangedProc;
-    FOnTaskInstanceChanged: TOnTaskInstanceChanged;
+    FOnTaskInstanceListChanged: TTaskInstanceListChangedProc;
+    FOnTaskInstanceChanged: TOnTaskInstanceProc;
+    FOnSendData: TOnTaskInstanceProc;
 
     function GetTaskCount: Integer;
 
     procedure LoadLibrary(const _File: String);
     procedure MessageProc(var _Message: TMessage);
-    procedure DoOnTaskInstancesChanged;
-    procedure DoOnTaskInstanceChanged(_Sender: TMKOTaskInstance);
+    procedure DoOnTaskInstanceListChanged;
+    procedure DoOnTaskInstanceChanged(_Instance: TMKOTaskInstance);
+    procedure DoOnSendData(_Instance: TMKOTaskInstance);
 
     property WndHandle: HWND read FWndHandle;
 
@@ -269,8 +272,9 @@ type
     property Libraries: TMKOLibraryList read FLibraries;
     property TaskInstances: TMKOTaskInstanceList read FTaskInstances;
     property TaskCount: Integer read GetTaskCount;
-    property OnTaskInstancesChanged: TTaskInstancesChangedProc read FOnTaskInstancesChanged write FOnTaskInstancesChanged;
-    property OnTaskInstanceChanged: TOnTaskInstanceChanged read FOnTaskInstanceChanged write FOnTaskInstanceChanged;
+    property OnTaskInstanceListChanged: TTaskInstanceListChangedProc read FOnTaskInstanceListChanged write FOnTaskInstanceListChanged;
+    property OnTaskInstanceChanged: TOnTaskInstanceProc read FOnTaskInstanceChanged write FOnTaskInstanceChanged;
+    property OnSendData: TOnTaskInstanceProc read FOnSendData write FOnSendData;
 
   end;
 
@@ -380,18 +384,23 @@ begin
 
 end;
 
-procedure TMKOTaskInstance.DoChanged(_Assured: Boolean);
+procedure TMKOTaskInstance.DoChanged;
+begin
+  PostMessage(WndHandle, WM_TASK_INSTANCE_CHANGED, WPARAM(Self), 0);
+end;
+
+procedure TMKOTaskInstance.DoSendData(_Assured: Boolean);
 var
   TC: Cardinal;
 begin
 
   TC := GetTickCount;
 
-  { Отправляем сообщение не слишком часто. }
-  if (TC - LastPostPoint > 100) or _Assured then
+  { Отправляем сообщение не слишком часто, чтобы не завалить очередь. }
+  if _Assured or (TC - LastPostPoint > 100) then
   begin
 
-    PostMessage(WndHandle, WM_TASK_INSTANCE_CHANGED, WPARAM(Self), 0);
+    PostMessage(WndHandle, WM_TASK_SEND_DATA, WPARAM(Self), 0);
     LastPostPoint := TC;
 
   end;
@@ -420,8 +429,20 @@ begin
   DataLocker.Acquire;
   try
 
-    for i := _Target.Count to Data.Count - 1 do
-      _Target.Add(Data[i]);
+    with _Target do
+    begin
+
+      BeginUpdate;
+      try
+
+        for i := Count to Data.Count - 1 do
+          Add(Data[i]);
+
+      finally
+        EndUpdate;
+      end;
+
+    end;
 
     _Progress := Progress;
 
@@ -448,6 +469,7 @@ begin
     StateLocker.Release;
   end;
 
+  DoChanged;
   WriteOut(State.Report, -1, True);
 
 end;
@@ -504,7 +526,7 @@ begin
     if _Progress <> -1 then
       FProgress := _Progress;
 
-    DoChanged(_Assured);
+    DoSendData(_Assured);
 
   finally
     DataLocker.Release;
@@ -717,7 +739,7 @@ begin
   Result := TMKOTaskInstance.Create(_MKOTask, _Params, WndHandle);
   TaskInstances.Insert(0, Result);
 
-  DoOnTaskInstancesChanged;
+  DoOnTaskInstanceListChanged;
 
 end;
 
@@ -735,7 +757,7 @@ end;
 destructor TMKOTaskServices.Destroy;
 begin
 
-  FOnTaskInstancesChanged := nil;
+  FOnTaskInstanceListChanged := nil;
   FOnTaskInstanceChanged := nil;
 
   FreeAndNil(FTaskInstances);
@@ -746,16 +768,22 @@ begin
 
 end;
 
-procedure TMKOTaskServices.DoOnTaskInstanceChanged(_Sender: TMKOTaskInstance);
+procedure TMKOTaskServices.DoOnTaskInstanceChanged(_Instance: TMKOTaskInstance);
 begin
   if Assigned(FOnTaskInstanceChanged) then
-    OnTaskInstanceChanged(_Sender);
+    OnTaskInstanceChanged(_Instance);
 end;
 
-procedure TMKOTaskServices.DoOnTaskInstancesChanged;
+procedure TMKOTaskServices.DoOnSendData(_Instance: TMKOTaskInstance);
 begin
-  if Assigned(FOnTaskInstancesChanged) then
-    OnTaskInstancesChanged;
+  if Assigned(FOnSendData) then
+    OnSendData(_Instance);
+end;
+
+procedure TMKOTaskServices.DoOnTaskInstanceListChanged;
+begin
+  if Assigned(FOnTaskInstanceListChanged) then
+    OnTaskInstanceListChanged;
 end;
 
 function TMKOTaskServices.GetTaskCount: Integer;
@@ -789,8 +817,12 @@ end;
 procedure TMKOTaskServices.MessageProc(var _Message: TMessage);
 begin
 
-  if _Message.Msg = WM_TASK_INSTANCE_CHANGED then
-    DoOnTaskInstanceChanged(TMKOTaskInstance(_Message.WParam));
+  case _Message.Msg of
+
+    WM_TASK_INSTANCE_CHANGED: DoOnTaskInstanceChanged(TMKOTaskInstance(_Message.WParam));
+    WM_TASK_SEND_DATA:        DoOnSendData           (TMKOTaskInstance(_Message.WParam));
+
+  end;
 
 end;
 

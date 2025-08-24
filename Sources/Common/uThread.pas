@@ -4,9 +4,9 @@ interface
 
 uses
   { VCL }
-  System.Classes,
+  System.Classes, System.SysUtils,
   { TM }
-  Common.uUtils, uInterfaces;
+  Common.uUtils, uInterfaces, uConsts;
 
 type
 
@@ -67,6 +67,8 @@ end;
 
 procedure TMKOTaskThread.DoBeforeExecute;
 begin
+
+
   if Assigned(FBeforeExecute) then
     BeforeExecute;
 end;
@@ -86,7 +88,15 @@ begin
       Intf.Execute(WiteOutIntf);
 
     except
-      ErrorOccured := True;
+      {TODO 3 -oVasilevSM: Здесь нужно добавить оболочку для OLE-обработки исключений из библиотек. }
+      on E: Exception do
+      begin
+
+        ErrorOccured := True;
+        WiteOutIntf.WriteOut(Format(SC_TASK_EXECUTE_ERROR_MESSAGE, [E.ClassName]), -1);
+
+      end;
+
     end;
 
   finally

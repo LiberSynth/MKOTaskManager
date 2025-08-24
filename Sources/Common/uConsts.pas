@@ -11,6 +11,7 @@ uses
 const
 
   WM_TASK_INSTANCE_CHANGED = WM_USER + 1000;
+  WM_TASK_SEND_DATA        = WM_USER + 1001;
 
   DC_GOLDEN_SECTION: Double = 1.618;
 
@@ -23,10 +24,9 @@ const
   SC_TASK_STATE_ERROR_CAPTION      = 'Ошибка';
 
   SC_TASK_STATE_REPORT_CREATED    = 'Задача создана.';
-  SC_TASK_STATE_REPORT_PROCESSING = 'Задача запущена.';
-  SC_TASK_STATE_REPORT_FINISHED   = 'Задача завершена.';
+  SC_TASK_STATE_REPORT_PROCESSING = 'Выполнение задачи запущено.';
+  SC_TASK_STATE_REPORT_FINISHED   = 'Выполнение задачи завершено.';
   SC_TASK_STATE_REPORT_CANCELED   = 'Выполнение задачи прервано.';
-  {TODO 2 -oVasilevSM : Желательно вернуть, что за ошибка. }
   SC_TASK_STATE_REPORT_ERROR      = 'При выполнении задачи возникла ошибка.';
 
   SC_TASKS_COLUMN_0_CAPTION = 'Задача';
@@ -46,6 +46,8 @@ const
 
       'Ошибка в исполнении метода IMKOTaskParams.ValidateParams. Если парамеры задачи не проходят валидацию, следует ' +
       'вернуть сообщение об ошибке в свойстве параметра метода _Params.ErrorMessage.';
+
+  SC_TASK_EXECUTE_ERROR_MESSAGE = 'При исполнении задачи возникло исключение класса %s.';
 
 implementation
 

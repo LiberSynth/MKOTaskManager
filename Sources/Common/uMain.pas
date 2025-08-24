@@ -6,7 +6,7 @@ uses
   { VCL }
   System.Classes, Vcl.Forms, System.Types, Vcl.Controls, Vcl.ComCtrls, Vcl.StdCtrls,
   Vcl.ExtCtrls, Vcl.Grids, System.Math, Vcl.Menus, System.SysUtils, System.DateUtils,
-  Winapi.Windows, Vcl.Graphics, System.ImageList, Vcl.ImgList,
+  Winapi.Windows, Vcl.Graphics, System.ImageList, Vcl.ImgList, Winapi.Messages,
   { Common }
   uStringGridHelper,
   { TM }
@@ -14,7 +14,6 @@ uses
 
 type
 
-  {TODO 1 -oVasilevSM : Добавить оболочку для исключений из библиотек. }
   {TODO 1 -oVasilevSM : Проверить на утечки фастмемом. }
   {TODO 4 -oVasilevSM : TO TRIM ALL UNITS IN PROJECT. }
   TfmMain = class(TForm)
@@ -42,30 +41,31 @@ type
 
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure miStartClick(Sender: TObject);
-    procedure sgTasksDblClick(Sender: TObject);
     procedure pmTaskItemsPopup(Sender: TObject);
     procedure miTerminateClick(Sender: TObject);
-    procedure sgTaskItemsDrawCell(Sender: TObject; ACol, ARow: LongInt; Rect: TRect; State: TGridDrawState);
     procedure sgTaskItemsSelectCell(Sender: TObject; ACol, ARow: LongInt; var CanSelect: Boolean);
+    procedure sgTasksDblClick(Sender: TObject);
     procedure sgTasksMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure sgTaskItemsDrawCell(Sender: TObject; ACol, ARow: LongInt; Rect: TRect; State: TGridDrawState);
 
   strict private
 
     procedure Init;
     procedure InitGrids;
     procedure AdjustSizes;
-    procedure FillTasks;
-    procedure FillTaskItems;
+    procedure RefreshTasks;
+    procedure RefreshTaskItemList;
     procedure RefreshTaskItem(_RecNo: Integer; _Item: TMKOTaskInstance);
-    procedure RefreshConsole;
+    procedure RefreshConsole(_Instance: TMKOTaskInstance; _FullRefresh: Boolean);
     procedure Finalize;
     procedure StartTask;
     procedure TerminateTask;
 
-    procedure TaskInstancesChanged;
-    procedure TaskInstanceChanged(_Sender: TMKOTaskInstance);
+    procedure TaskInstanceListChanged;
+    procedure TaskInstanceChanged(_Instance: TMKOTaskInstance);
+    procedure TaskInstanceSendData(_Instance: TMKOTaskInstance);
     function FindTaskItemIndex(_TaskItemObject: TObject; var _Row: Integer): Boolean;
     function FindTaskInstance(_Row: Integer; var _Value: TMKOTaskInstance): Boolean;
     function TryGetCurrentTaskInstance(var _Value: TMKOTaskInstance): Boolean;
@@ -88,49 +88,54 @@ var
   Index: Integer;
 begin
 
-  with sgTaskItems.Canvas do
+  with sgTaskItems, Canvas do
   begin
 
     Brush.Color := clWhite;
     FillRect(_Rect);
 
-  end;
+    if FindTaskInstance(_RecNo, TaskInstance) then
+    begin
 
-  if FindTaskInstance(_RecNo, TaskInstance) then
-  begin
+      Index := TaskInstanceStateImageIndex(TaskInstance.State);
 
-    Index := TaskInstanceStateImageIndex(TaskInstance.State);
+      _Rect.Offset(
 
-    _Rect.Offset(
+          (DefaultRowHeight - ilTaskItems.Height) div 2,
+          (ColWidths[0] - ilTaskItems.Width) div 2
 
-        (sgTaskItems.DefaultRowHeight - ilTaskItems.Height) div 2,
-        (sgTaskItems.ColWidths[0] - ilTaskItems.Width) div 2
+      );
+      ilTaskItems.Draw(Canvas, _Rect.Left, _Rect.Top, Index);
 
-    );
-    ilTaskItems.Draw(sgTaskItems.Canvas, _Rect.Left, _Rect.Top, Index);
+    end;
 
   end;
 
 end;
 
-procedure TfmMain.RefreshConsole;
+procedure TfmMain.RefreshConsole(_Instance: TMKOTaskInstance; _FullRefresh: Boolean);
 var
-  TaskInstance: TMKOTaskInstance;
   Progress: Integer;
 begin
 
-  if TryGetCurrentTaskInstance(TaskInstance) then
+  with mConsole do
   begin
 
-    mConsole.LockDrawing;
+    LockDrawing;
     try
 
-      TaskInstance.PullData(mConsole.Lines, Progress);
+      if _FullRefresh then
+        Clear;
+
+      _Instance.PullData(Lines, Progress);
+
       pbProgress.Position := Progress;
 
     finally
-      mConsole.UnlockDrawing;
+      UnlockDrawing;
     end;
+
+    SendMessage(Handle, EM_LINESCROLL, 0, Lines.Count);
 
   end;
 
@@ -142,10 +147,24 @@ begin
   with sgTaskItems do
   begin
 
-    Cells[1, _RecNo] := _Item.Task.Intf.Caption;
-    Cells[2, _RecNo] := _Item.Params.ToString;
-    Cells[3, _RecNo] := _Item.State.ToString;
-    Cells[4, _RecNo] := _Item.Date.ToString;
+    LockDrawing;
+    try
+
+      BeginUpdate;
+      try
+
+        Cells[1, _RecNo] := _Item.Task.Intf.Caption;
+        Cells[2, _RecNo] := _Item.Params.ToString;
+        Cells[3, _RecNo] := _Item.State.ToString;
+        Cells[4, _RecNo] := _Item.Date.ToString;
+
+      finally
+        EndUpdate;
+      end;
+
+    finally
+      UnlockDrawing;
+    end;
 
     { Чтобы иконка отрисовалась }
     sgTaskItems.Refresh;
@@ -154,7 +173,7 @@ begin
 
 end;
 
-procedure TfmMain.FillTaskItems;
+procedure TfmMain.RefreshTaskItemList;
 var
   RecNo: Integer;
   Item: TMKOTaskInstance;
@@ -163,36 +182,44 @@ begin
   with sgTaskItems do
   begin
 
-    BeginUpdate;
+    LockDrawing;
     try
 
-      { Обновляем весь набор, подобно перезапросу данных целиком. }
-      RowCount := 1;
-      RowCount := Max(TaskServices.TaskInstances.Count + 1, 2);
-      FixedRows := 1;
+      BeginUpdate;
+      try
 
-      RecNo := 0;
-      for Item in TaskServices.TaskInstances do
-      begin
+        { Обновляем весь набор, подобно перезапросу данных целиком. }
+        RowCount := 1;
+        RowCount := Max(TaskServices.TaskInstances.Count + 1, 2);
+        FixedRows := 1;
 
-        Inc(RecNo);
+        RecNo := 0;
+        for Item in TaskServices.TaskInstances do
+        begin
 
-        Objects[0, RecNo] := Item;
-        RefreshTaskItem(RecNo, Item);
+          Inc(RecNo);
 
+          Objects[0, RecNo] := Item;
+          RefreshTaskItem(RecNo, Item);
+
+        end;
+
+      finally
+        EndUpdate;
       end;
 
     finally
-      EndUpdate;
+      UnlockDrawing;
     end;
 
   end;
 
-  RefreshConsole;
+  if TryGetCurrentTaskInstance(Item) then
+    RefreshConsole(Item, True);
 
 end;
 
-procedure TfmMain.FillTasks;
+procedure TfmMain.RefreshTasks;
 var
   RecNo: Integer;
   MKOLibrary: TMKOLibrary;
@@ -233,9 +260,9 @@ end;
 procedure TfmMain.Finalize;
 begin
 
-  { Чтобы не забыть. }
-  TaskServices.OnTaskInstancesChanged := nil;
+  TaskServices.OnTaskInstanceListChanged := nil;
   TaskServices.OnTaskInstanceChanged := nil;
+  TaskServices.OnSendData := nil;
 
 end;
 
@@ -244,8 +271,7 @@ var
   TaskInstanceObject: TObject;
 begin
 
-  with sgTaskItems do
-    TaskInstanceObject := Objects[0, _Row];
+  TaskInstanceObject := sgTaskItems.Objects[0, _Row];
 
   Result := Assigned(TaskInstanceObject);
 
@@ -287,7 +313,7 @@ begin
 
   Init;
   TaskServices.LoadLibraries;
-  FillTasks;
+  RefreshTasks;
 
 end;
 
@@ -304,8 +330,9 @@ end;
 procedure TfmMain.Init;
 begin
 
-  TaskServices.OnTaskInstancesChanged := TaskInstancesChanged;
+  TaskServices.OnTaskInstanceListChanged := TaskInstanceListChanged;
   TaskServices.OnTaskInstanceChanged := TaskInstanceChanged;
+  TaskServices.OnSendData := TaskInstanceSendData;
   InitGrids;
   AdjustSizes;
 
@@ -426,9 +453,18 @@ begin
 end;
 
 procedure TfmMain.sgTaskItemsSelectCell(Sender: TObject; ACol, ARow: LongInt; var CanSelect: Boolean);
+var
+  TaskInstance: TMKOTaskInstance;
 begin
-  if not sgTaskItems.IsUpdating and (ARow > 0) then
-    RefreshConsole;
+
+  if
+
+      not sgTaskItems.IsUpdating and
+      (ARow > 0) and
+      TryGetCurrentTaskInstance(TaskInstance)
+
+  then RefreshConsole(TaskInstance, True);
+
 end;
 
 procedure TfmMain.sgTasksDblClick(Sender: TObject);
@@ -440,8 +476,9 @@ procedure TfmMain.sgTasksMouseDown(Sender: TObject; Button: TMouseButton; Shift:
 begin
 
   if Button = mbRight then
-    with Sender as TStringGrid do
-      Row := MouseCoord(X, Y).Y;
+    with Sender as TStringGrid, MouseCoord(X, Y) do
+      if Y > -1 then
+        Row := Y;
 
 end;
 
@@ -512,23 +549,33 @@ begin
 
 end;
 
-procedure TfmMain.TaskInstanceChanged(_Sender: TMKOTaskInstance);
+procedure TfmMain.TaskInstanceChanged(_Instance: TMKOTaskInstance);
 var
-  RecNo: Integer;
+  Row: Integer;
 begin
 
-  if FindTaskItemIndex(_Sender, RecNo) then
-    RefreshTaskItem(RecNo, _Sender);
-
-  with sgTaskItems do
-    if _Sender = Objects[0, Row] then
-      RefreshConsole;
+  if FindTaskItemIndex(_Instance, Row) then
+    RefreshTaskItem(Row, _Instance);
 
 end;
 
-procedure TfmMain.TaskInstancesChanged;
+procedure TfmMain.TaskInstanceSendData(_Instance: TMKOTaskInstance);
+var
+  Row: Integer;
 begin
-  FillTaskItems;
+
+  if
+
+      FindTaskItemIndex(_Instance, Row) and
+      (Row = sgTaskItems.Row)
+
+  then RefreshConsole(_Instance, False);
+
+end;
+
+procedure TfmMain.TaskInstanceListChanged;
+begin
+  RefreshTaskItemList;
 end;
 
 function TfmMain.TaskInstanceStateImageIndex(_State: TTaskState): Integer;
