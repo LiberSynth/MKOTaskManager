@@ -56,9 +56,11 @@ type
     FWndHandle: HWND;
     FState: TTaskState;
     FData: TStringList;
+    FDataChanged: Boolean;
+    FDataPosted: Boolean;
+    FLastPostPoint: Cardinal;
     FProgress: Integer;
     FDate: TDateTime;
-    FLastPostPoint: Cardinal;
     FStateLocker: TCriticalSection;
     FDataLocker: TCriticalSection;
 
@@ -79,6 +81,8 @@ type
     property DataLocker: TCriticalSection read FDataLocker;
     property WndHandle: HWND read FWndHandle;
     property Data: TStringList read FData write FData;
+    property DataChanged: Boolean read FDataChanged;
+    property DataPosted: Boolean read FDataPosted;
     property LastPostPoint: Cardinal read FLastPostPoint write FLastPostPoint;
 
   private
@@ -416,10 +420,17 @@ begin
 
   TC := GetTickCount;
 
-  { Отправляем сообщение не слишком часто, чтобы не завалить очередь. }
-  if _Assured or (TC - LastPostPoint > 100) then
+  if
+
+      DataChanged and
+      not DataPosted and
+      { Отправляем сообщение не слишком часто, чтобы не завалить очередь. }
+      (_Assured or (TC - LastPostPoint > IC_MIN_POSTING_INTERVAL))
+
+  then
   begin
 
+    FDataPosted := True;
     PostMessage(WndHandle, WM_TASK_SEND_DATA, WPARAM(Self), 0);
     LastPostPoint := TC;
 
@@ -449,14 +460,16 @@ begin
   DataLocker.Acquire;
   try
 
+    if _Target.Count <> Data.Count then
+
     with _Target do
     begin
 
       BeginUpdate;
       try
 
-        for i := Count to Data.Count - 1 do
-          Add(Data[i]);
+        { Как ни странно, это быстрее работает. }
+        Text := Data.Text;
 
       finally
         EndUpdate;
@@ -465,6 +478,9 @@ begin
     end;
 
     _Progress := Progress;
+
+    FDataChanged := False;
+    FDataPosted := False;
 
   finally
     DataLocker.Release;
@@ -515,25 +531,14 @@ const
   AC_MAP: array[Boolean] of TTaskState = (tsFinished, tsError);
 begin
 
-  {$IFDEF DEBUG}
-  { Чтобы в при отладке нагладнее наблюдать за процессом. }
-  Sleep(800);
-  {$ENDIF}
   State := AC_MAP[_ErrorOccured];
-
   TaskServices.StartWaiting;
 
 end;
 
 procedure TMKOTaskInstance.ThreadBeforeExecute;
 begin
-
-  {$IFDEF DEBUG}
-  { Чтобы в при отладке нагладнее наблюдать за процессом. }
-  Sleep(800);
-  {$ENDIF}
   State := tsProcessing;
-
 end;
 
 procedure TMKOTaskInstance.ThreadOnTerminate(_Sender: TObject);
@@ -548,10 +553,20 @@ begin
   try
 
     if Length(_Value) > 0 then
-      Data.Add(_Value);
+    begin
 
-    if _Progress <> -1 then
+      Data.Add(_Value);
+      FDataChanged := True;
+
+    end;
+
+    if (_Progress <> -1) and (Progress <> _Progress) then
+    begin
+
       FProgress := _Progress;
+      FDataChanged := True;
+
+    end;
 
     DoSendData(_Assured);
 

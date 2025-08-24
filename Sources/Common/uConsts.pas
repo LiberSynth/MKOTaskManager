@@ -10,7 +10,8 @@ uses
 
 const
 
-  IC_MAXTHREAD_COUNT = 5;
+  IC_MAXTHREAD_COUNT      = 10;
+  IC_MIN_POSTING_INTERVAL = 30;
 
   WM_TASK_INSTANCE_CHANGED = WM_USER + 1000;
   WM_TASK_SEND_DATA        = WM_USER + 1001;
@@ -51,7 +52,7 @@ const
       'Ошибка в исполнении метода IMKOTaskParams.ValidateParams. Если парамеры задачи не проходят валидацию, следует ' +
       'вернуть сообщение об ошибке в свойстве параметра метода _Params.ErrorMessage.';
 
-  SC_TASK_EXECUTE_ERROR_MESSAGE = 'При исполнении задачи возникло исключение класса %s.';
+  SC_TASK_EXECUTE_ERROR_MESSAGE = 'При выполнении задачи возникло исключение %s: %s.';
 
 implementation
 

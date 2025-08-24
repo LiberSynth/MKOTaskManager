@@ -93,7 +93,7 @@ begin
       begin
 
         ErrorOccured := True;
-        WiteOutIntf.WriteOut(Format(SC_TASK_EXECUTE_ERROR_MESSAGE, [E.ClassName]), -1);
+        WiteOutIntf.WriteOut(Format(SC_TASK_EXECUTE_ERROR_MESSAGE, [E.ClassName, E.Message]), -1);
 
       end;
 

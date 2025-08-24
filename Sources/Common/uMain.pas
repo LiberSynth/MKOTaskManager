@@ -53,6 +53,8 @@ type
 
   strict private
 
+    FTaskItemsRow: Integer;
+
     procedure Init;
     procedure InitGrids;
     procedure AdjustSizes;
@@ -68,15 +70,17 @@ type
     procedure TaskInstanceListChanged;
     procedure TaskInstanceChanged(_Instance: TMKOTaskInstance);
     procedure TaskInstanceSendData(_Instance: TMKOTaskInstance);
+    function TaskItemsRowChanged: Boolean;
     function FindTaskItemIndex(_TaskItemObject: TObject; var _Row: Integer): Boolean;
-    function FindTask(_Row: Integer; var _Value: TMKOTask): Boolean;
-    function FindTaskInstance(_Row: Integer; var _Value: TMKOTaskInstance): Boolean;
     function TryGetCurrentTask(var _Value: TMKOTask): Boolean;
+    function FindTaskInstance(_Row: Integer; var _Value: TMKOTaskInstance): Boolean;
     function TryGetCurrentTaskInstance(var _Value: TMKOTaskInstance): Boolean;
     procedure DrawIndicatorCell(_RecNo: Integer; _Rect: TRect);
     function TaskInstanceStateImageIndex(_State: TTaskState): Integer;
     procedure ProcessShortCut(_ShortCut: TShortCut);
     function InputParamsDialogText(_Task: TMKOTask): String;
+
+    property TaskItemsRow: Integer read FTaskItemsRow;
 
   end;
 
@@ -134,7 +138,9 @@ begin
 
       _Instance.PullData(Lines, Progress);
 
-      pbProgress.Position := Progress;
+      with pbProgress do
+        if Position <> Progress then
+          Position := Progress;
 
     finally
       UnlockDrawing;
@@ -271,31 +277,13 @@ begin
 
 end;
 
-function TfmMain.FindTask(_Row: Integer; var _Value: TMKOTask): Boolean;
-var
-  TaskObject: TObject;
-begin
-
-  TaskObject := sgTasks.Objects[0, _Row];
-
-  Result := Assigned(TaskObject);
-
-  if Result then
-  begin
-
-    if not (TaskObject is TMKOTask) then
-      raise EMKOTMException.Create('The object associated with this list item is not TMKOTask.');
-
-    _Value := TMKOTask(TaskObject);
-
-  end;
-
-end;
-
 function TfmMain.FindTaskInstance(_Row: Integer; var _Value: TMKOTaskInstance): Boolean;
 var
   TaskInstanceObject: TObject;
 begin
+
+  if _Row = 0 then
+    Exit(False);
 
   TaskInstanceObject := sgTaskItems.Objects[0, _Row];
 
@@ -412,7 +400,7 @@ begin
 
   ParamString := '';
   {$IFDEF DEBUG}
-  ParamString := '1' + CRLF + 'C:\WorkMKO\_out\Win32\Debug\MKOTaskManager.exe';
+  ParamString := '12' + CRLF + 'C:\WorkMKO\_out\Win32\Debug\MKOTaskManager.exe';
   {$ENDIF}
 
   Result := False;
@@ -555,6 +543,7 @@ begin
 
       not sgTaskItems.IsUpdating and
       (ARow > 0) and
+      TaskItemsRowChanged and
       TryGetCurrentTaskInstance(TaskInstance)
 
   then RefreshConsole(TaskInstance, True);
@@ -629,6 +618,15 @@ const
   AA_MAP: array[TTaskState] of Byte = (0, 1, 2, 3, 4, 5);
 begin
   Result := AA_MAP[_State];
+end;
+
+function TfmMain.TaskItemsRowChanged: Boolean;
+begin
+
+  Result := sgTaskItems.Row <> TaskItemsRow;
+  if Result then
+    FTaskItemsRow := sgTaskItems.Row;
+
 end;
 
 procedure TfmMain.TerminateTask;
