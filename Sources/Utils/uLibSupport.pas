@@ -602,6 +602,7 @@ begin
   inherited Create;
 
   FList := TStringList.Create;
+  {TODO 2 -oVasilevSM : Здесь нужен парсер для более свободного формата параметров. Через , итд. }
   List.Text := _Params;
 
 end;

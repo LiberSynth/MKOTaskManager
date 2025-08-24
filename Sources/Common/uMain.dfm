@@ -195,6 +195,7 @@ object fmMain: TfmMain
     end
   end
   object pmTasks: TPopupMenu
+    OnPopup = pmTasksPopup
     Left = 16
     Top = 76
     object miStart: TMenuItem

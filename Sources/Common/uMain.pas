@@ -42,6 +42,7 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure pmTasksPopup(Sender: TObject);
     procedure miStartClick(Sender: TObject);
     procedure pmTaskItemsPopup(Sender: TObject);
     procedure miTerminateClick(Sender: TObject);
@@ -62,16 +63,20 @@ type
     procedure Finalize;
     procedure StartTask;
     procedure TerminateTask;
+    function InputTaskParams(_Task: TMKOTask; var _Params: IMKOTaskParams): Boolean;
 
     procedure TaskInstanceListChanged;
     procedure TaskInstanceChanged(_Instance: TMKOTaskInstance);
     procedure TaskInstanceSendData(_Instance: TMKOTaskInstance);
     function FindTaskItemIndex(_TaskItemObject: TObject; var _Row: Integer): Boolean;
+    function FindTask(_Row: Integer; var _Value: TMKOTask): Boolean;
     function FindTaskInstance(_Row: Integer; var _Value: TMKOTaskInstance): Boolean;
+    function TryGetCurrentTask(var _Value: TMKOTask): Boolean;
     function TryGetCurrentTaskInstance(var _Value: TMKOTaskInstance): Boolean;
     procedure DrawIndicatorCell(_RecNo: Integer; _Rect: TRect);
     function TaskInstanceStateImageIndex(_State: TTaskState): Integer;
     procedure ProcessShortCut(_ShortCut: TShortCut);
+    function InputParamsDialogText(_Task: TMKOTask): String;
 
   end;
 
@@ -266,6 +271,27 @@ begin
 
 end;
 
+function TfmMain.FindTask(_Row: Integer; var _Value: TMKOTask): Boolean;
+var
+  TaskObject: TObject;
+begin
+
+  TaskObject := sgTasks.Objects[0, _Row];
+
+  Result := Assigned(TaskObject);
+
+  if Result then
+  begin
+
+    if not (TaskObject is TMKOTask) then
+      raise EMKOTMException.Create('The object associated with this list item is not TMKOTask.');
+
+    _Value := TMKOTask(TaskObject);
+
+  end;
+
+end;
+
 function TfmMain.FindTaskInstance(_Row: Integer; var _Value: TMKOTaskInstance): Boolean;
 var
   TaskInstanceObject: TObject;
@@ -370,6 +396,60 @@ begin
 
 end;
 
+function TfmMain.InputParamsDialogText(_Task: TMKOTask): String;
+begin
+
+  Result := SC_GET_TASK_PARAMS_FORM_TEXT;
+  if Length(_Task.Intf.ParamsHelpText) > 0 then
+    Result := Format('%s' + CRLFx2 + '%s', [Result, _Task.Intf.ParamsHelpText]);
+
+end;
+
+function TfmMain.InputTaskParams(_Task: TMKOTask; var _Params: IMKOTaskParams): Boolean;
+var
+  ParamString: String;
+begin
+
+  ParamString := '';
+  {$IFDEF DEBUG}
+  ParamString := '1' + CRLF + 'C:\WorkMKO\_out\Win32\Debug\MKOTaskManager.exe';
+  {$ENDIF}
+
+  Result := False;
+  repeat
+
+    if not InputText(
+
+        SC_GET_TASK_PARAMS_FORM_CAPTION,
+        InputParamsDialogText(_Task),
+        ParamString
+
+    ) then Break;
+
+    _Params := TMKOTaskParams.Create(ParamString);
+    try
+
+      Result := _Task.ValidateParams(_Params);
+
+      if not Result then
+      begin
+
+        if Length(_Params.ErrorMessage) = 0 then
+          raise EMKOTMException.Create(SC_EMPTY_TASK_PARAMS_ERROR_MESSAGE);
+
+        MessageBox(SC_MESSAGE_BOX_ERROR_CAPTION, _Params.ErrorMessage, MB_OK, MB_ICONERROR);
+
+      end;
+
+    finally
+      if not Result then
+        _Params := nil;
+    end;
+
+  until Result;
+
+end;
+
 procedure TfmMain.miStartClick(Sender: TObject);
 begin
   StartTask;
@@ -392,6 +472,20 @@ begin
         (Row >= 1) and
         TryGetCurrentTaskInstance(TaskItem) and
         (TaskItem.State = tsProcessing);
+
+end;
+
+procedure TfmMain.pmTasksPopup(Sender: TObject);
+var
+  Task: TMKOTask;
+begin
+
+  with sgTaskItems do
+
+    miStart.Enabled :=
+
+        (Row >= 1) and
+        TryGetCurrentTask(Task);
 
 end;
 
@@ -484,68 +578,20 @@ end;
 
 procedure TfmMain.StartTask;
 var
-  TaskObject: TObject;
   Task: TMKOTask;
-  ParamString, InputParamsText: String;
   Params: IMKOTaskParams;
-  ValidParams: Boolean;
 begin
 
-  with sgTasks do
-    TaskObject := Objects[0, Row];
+  if not TryGetCurrentTask(Task) then
+    raise Exception.Create('Something''s going wrong.');
 
-  if not (TaskObject is TMKOTask) then
-    raise EMKOTMException.Create('The object associated with this list item is not TMKOTask.');
+  if InputTaskParams(Task, Params) then
+  begin
 
-  Task := TMKOTask(TaskObject);
+    Task.StartTask(Params);
+    mConsole.Clear;
 
-  ParamString := '';
-  {$IFDEF DEBUG}
-  ParamString := '*.pas' + CRLF + 'C:\WorkTP';
-  {$ENDIF}
-  InputParamsText := SC_GET_TASK_PARAMS_FORM_TEXT;
-  if Length(Task.Intf.ParamsHelpText) > 0 then
-    InputParamsText := Format('%s' + CRLFx2 + '%s', [InputParamsText, Task.Intf.ParamsHelpText]);
-
-  ValidParams := False;
-  repeat
-
-    if not InputText(
-
-        SC_GET_TASK_PARAMS_FORM_CAPTION,
-        InputParamsText,
-        ParamString
-
-    ) then Break;
-
-    Params := TMKOTaskParams.Create(ParamString);
-    try
-
-      ValidParams := Task.ValidateParams(Params);
-
-      if ValidParams then
-      begin
-
-        Task.StartTask(Params);
-        mConsole.Clear;
-
-      end
-      else
-      begin
-
-        if Length(Params.ErrorMessage) = 0 then
-          raise EMKOTMException.Create(SC_EMPTY_TASK_PARAMS_ERROR_MESSAGE);
-
-        MessageBox(SC_MESSAGE_BOX_ERROR_CAPTION, Params.ErrorMessage, MB_OK, MB_ICONERROR);
-
-      end;
-
-    finally
-      if not ValidParams then
-        Params := nil;
-    end;
-
-  until ValidParams;
+  end;
 
 end;
 
@@ -591,6 +637,24 @@ var
 begin
   if TryGetCurrentTaskInstance(TaskInstance) and (TaskInstance.State = tsProcessing) then
     TaskInstance.Terminate;
+end;
+
+function TfmMain.TryGetCurrentTask(var _Value: TMKOTask): Boolean;
+begin
+
+  with sgTasks do
+  begin
+
+    Result :=
+
+        (Row > 0) and
+        (Objects[0, Row] is TMKOTask);
+
+    if Result then
+      _Value := TMKOTask(Objects[0, Row]);
+
+  end;
+
 end;
 
 function TfmMain.TryGetCurrentTaskInstance(var _Value: TMKOTaskInstance): Boolean;
