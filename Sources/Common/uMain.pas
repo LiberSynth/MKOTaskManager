@@ -579,20 +579,10 @@ begin
 end;
 
 function TfmMain.TaskInstanceStateImageIndex(_State: TTaskState): Integer;
+const
+  AA_MAP: array[TTaskState] of Byte = (0, 1, 2, 3, 4, 5);
 begin
-
-  case _State of
-
-    tsCreated:    Result := 0;
-    tsProcessing: Result := 1;
-    tsFinished:   Result := 2;
-    tsCanceled:   Result := 3;
-    tsError:      Result := 4;
-
-  else
-    raise Exception.Create('Complete this method.');
-  end;
-
+  Result := AA_MAP[_State];
 end;
 
 procedure TfmMain.TerminateTask;

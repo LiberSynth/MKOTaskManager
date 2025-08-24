@@ -13,7 +13,7 @@ uses
 
 type
 
-  TTaskState = (tsCreated, tsProcessing, tsFinished, tsCanceled, tsError);
+  TTaskState = (tsCreated, tsWaiting, tsProcessing, tsFinished, tsCanceled, tsError);
 
   TTaskStateHelper = record helper for TTaskState
 
@@ -69,6 +69,7 @@ type
     procedure ThreadBeforeExecute;
     procedure ThreadAfterExecute(_ErrorOccured: Boolean);
     procedure ThreadOnTerminate(_Sender: TObject);
+    function CanStart: Boolean;
     procedure DoChanged;
     procedure DoSendData(_Assured: Boolean);
 
@@ -89,6 +90,8 @@ type
         _WndHandle: HWND
 
     ); reintroduce;
+
+    procedure StartThread;
 
     { Многопоточный метод }
     procedure WriteOut(const _Value: WideString; _Progress: Integer; _Assured: Boolean = False);
@@ -113,7 +116,14 @@ type
 
   end;
 
-  TMKOTaskInstanceList = class(TList<TMKOTaskInstance>);
+  TMKOTaskInstanceList = class(TList<TMKOTaskInstance>)
+
+  private
+
+    function StateCount(_State: TTaskState): Integer;
+    function StateFind(_State: TTaskState; var _Instance: TMKOTaskInstance): Boolean;
+
+  end;
 
   TMKOTaskParams = class(TInterfacedObject, IMKOTaskParams)
 
@@ -261,6 +271,8 @@ type
     procedure FinalizeLibraries;
     procedure FinalizeTaskInstances;
 
+    procedure StartWaiting;
+
     function AddTaskInstance(_MKOTask: TMKOTask; const _Params: IMKOTaskParams): TMKOTaskInstance;
 
   public
@@ -289,16 +301,17 @@ end;
 
 { TTaskStateHelper }
 
-function TTaskStateHelper.Report: String;
+function TTaskStateHelper.ToString: String;
 const
 
   AA_MAP: array[TTaskState] of String = (
 
-      SC_TASK_STATE_REPORT_CREATED,
-      SC_TASK_STATE_REPORT_PROCESSING,
-      SC_TASK_STATE_REPORT_FINISHED,
-      SC_TASK_STATE_REPORT_CANCELED,
-      SC_TASK_STATE_REPORT_ERROR
+    SC_TASK_STATE_CREATED_CAPTION,
+    SC_TASK_STATE_WAITING_CAPTION,
+    SC_TASK_STATE_PROCESSING_CAPTION,
+    SC_TASK_STATE_FINISHED_CAPTION,
+    SC_TASK_STATE_CANCELED_CAPTION,
+    SC_TASK_STATE_ERROR_CAPTION
 
   );
 
@@ -306,17 +319,17 @@ begin
   Result := AA_MAP[Self];
 end;
 
-
-function TTaskStateHelper.ToString: String;
+function TTaskStateHelper.Report: String;
 const
 
   AA_MAP: array[TTaskState] of String = (
 
-    SC_TASK_STATE_CREATED_CAPTION,
-    SC_TASK_STATE_PROCESSING_CAPTION,
-    SC_TASK_STATE_FINISHED_CAPTION,
-    SC_TASK_STATE_CANCELED_CAPTION,
-    SC_TASK_STATE_ERROR_CAPTION
+      SC_TASK_STATE_CREATED_REPORT,
+      SC_TASK_STATE_WAITING_REPORT,
+      SC_TASK_STATE_PROCESSING_REPORT,
+      SC_TASK_STATE_FINISHED_REPORT,
+      SC_TASK_STATE_CANCELED_REPORT,
+      SC_TASK_STATE_ERROR_REPORT
 
   );
 
@@ -339,6 +352,11 @@ end;
 
 { TMKOTaskInstance }
 
+function TMKOTaskInstance.CanStart: Boolean;
+begin
+  Result := TaskServices.TaskInstances.StateCount(tsProcessing) < IC_MAXTHREAD_COUNT;
+end;
+
 constructor TMKOTaskInstance.Create;
 begin
 
@@ -352,10 +370,11 @@ begin
   FStateLocker := TCriticalSection.Create;
   FDataLocker := TCriticalSection.Create;
   FData := TStringList.Create;
-  CreateThread;
 
   { Для вывода }
   State := tsCreated;
+
+  CreateThread;
 
 end;
 
@@ -369,7 +388,8 @@ begin
   Thread.AfterExecute := ThreadAfterExecute;
   Thread.OnTerminate := ThreadOnTerminate;
 
-  Thread.Start;
+  if CanStart then StartThread
+  else State := tsWaiting;
 
 end;
 
@@ -474,6 +494,11 @@ begin
 
 end;
 
+procedure TMKOTaskInstance.StartThread;
+begin
+  Thread.Start;
+end;
+
 procedure TMKOTaskInstance.Terminate;
 begin
 
@@ -495,6 +520,8 @@ begin
   Sleep(800);
   {$ENDIF}
   State := AC_MAP[_ErrorOccured];
+
+  TaskServices.StartWaiting;
 
 end;
 
@@ -531,6 +558,39 @@ begin
   finally
     DataLocker.Release;
   end;
+
+end;
+
+{ TMKOTaskInstanceList }
+
+function TMKOTaskInstanceList.StateCount(_State: TTaskState): Integer;
+var
+  Item: TMKOTaskInstance;
+begin
+
+  Result := 0;
+  for Item in Self do
+    if Item.State = _State then
+      Inc(Result);
+
+end;
+
+function TMKOTaskInstanceList.StateFind(_State: TTaskState; var _Instance: TMKOTaskInstance): Boolean;
+var
+  Item: TMKOTaskInstance;
+begin
+
+  for Item in Self do
+
+    if Item.State = _State then
+    begin
+
+      _Instance := Item;
+      Exit(True);
+
+    end;
+
+  Result := False;
 
 end;
 
@@ -823,6 +883,16 @@ begin
     WM_TASK_SEND_DATA:        DoOnSendData           (TMKOTaskInstance(_Message.WParam));
 
   end;
+
+end;
+
+procedure TMKOTaskServices.StartWaiting;
+var
+  TaskInstance: TMKOTaskInstance;
+begin
+
+  if TaskInstances.StateFind(tsWaiting, TaskInstance) then
+    TaskInstance.StartThread;
 
 end;
 
