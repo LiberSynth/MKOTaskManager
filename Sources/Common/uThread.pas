@@ -67,8 +67,6 @@ end;
 
 procedure TMKOTaskThread.DoBeforeExecute;
 begin
-
-
   if Assigned(FBeforeExecute) then
     BeforeExecute;
 end;
@@ -78,17 +76,16 @@ var
   ErrorOccured: Boolean;
 begin
 
-  ErrorOccured := False;
-
   DoBeforeExecute;
   try
 
     try
 
       Intf.Execute(WiteOutIntf);
+      ErrorOccured := False;
 
     except
-      {TODO 3 -oVasilevSM: Здесь нужно добавить оболочку для OLE-обработки исключений из библиотек. }
+      {TODO 3 -oVasilevSM: Здесь нужно добавить оболочку для обработки исключений. }
       on E: Exception do
       begin
 

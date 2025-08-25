@@ -275,7 +275,7 @@ type
     procedure FinalizeLibraries;
     procedure FinalizeTaskInstances;
 
-    procedure StartWaiting;
+    procedure CheckWaiting;
 
     function AddTaskInstance(_MKOTask: TMKOTask; const _Params: IMKOTaskParams): TMKOTaskInstance;
 
@@ -424,7 +424,8 @@ begin
 
       DataChanged and
       not DataPosted and
-      { ќтправл€ем сообщение не слишком часто, чтобы не завалить очередь. }
+      { ќтправл€ем сообщение не слишком часто, чтобы не заваливать очередь. ѕо завершению
+        обработки в любом случае будет смена статуса с гарантированной отправкой. }
       (_Assured or (TC - LastPostPoint > IC_MIN_POSTING_INTERVAL))
 
   then
@@ -470,6 +471,12 @@ begin
 
         {  ак ни странно, это быстрее работает. }
         Text := Data.Text;
+        { «десь предполагалс€ такой цикл:
+
+        for i := Count to Data.Count - 1 do
+          Add(Data[i]);
+
+          Ќо, он работает совсем медленно при большом количестве строк. }
 
       finally
         EndUpdate;
@@ -532,7 +539,7 @@ const
 begin
 
   State := AC_MAP[_ErrorOccured];
-  TaskServices.StartWaiting;
+  TaskServices.CheckWaiting;
 
 end;
 
@@ -896,13 +903,14 @@ begin
   case _Message.Msg of
 
     WM_TASK_INSTANCE_CHANGED: DoOnTaskInstanceChanged(TMKOTaskInstance(_Message.WParam));
+    {TODO 1 -oVasilevSM : Ќужно разделить отправку данных и прогресса на две разные обработки. }
     WM_TASK_SEND_DATA:        DoOnSendData           (TMKOTaskInstance(_Message.WParam));
 
   end;
 
 end;
 
-procedure TMKOTaskServices.StartWaiting;
+procedure TMKOTaskServices.CheckWaiting;
 var
   TaskInstance: TMKOTaskInstance;
 begin
