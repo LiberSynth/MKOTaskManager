@@ -54,6 +54,8 @@ const
 
   SC_TASK_EXECUTE_ERROR_MESSAGE = 'При выполнении задачи возникло исключение %s: %s.';
 
+  SC_TASK_SUMMARY = 'Всего задач %d, запущено %d, успешно завершено %d.';
+
 implementation
 
 end.

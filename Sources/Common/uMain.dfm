@@ -19,7 +19,7 @@ object fmMain: TfmMain
     Left = 0
     Top = 0
     Width = 624
-    Height = 441
+    Height = 422
     Align = alClient
     BevelOuter = bvNone
     ColumnCollection = <
@@ -45,11 +45,12 @@ object fmMain: TfmMain
         Value = 100.000000000000000000
       end>
     TabOrder = 0
+    ExplicitHeight = 441
     object pRightSide: TGridPanel
       Left = 208
       Top = 0
       Width = 416
-      Height = 441
+      Height = 422
       Align = alClient
       BevelOuter = bvNone
       ColumnCollection = <
@@ -75,14 +76,16 @@ object fmMain: TfmMain
           Value = 50.000000000000000000
         end>
       TabOrder = 1
+      ExplicitHeight = 441
       object pRunning: TPanel
         Left = 0
         Top = 0
         Width = 416
-        Height = 220
+        Height = 211
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
+        ExplicitHeight = 220
         object lRunning: TLabel
           Left = 4
           Top = 4
@@ -95,7 +98,7 @@ object fmMain: TfmMain
           Left = 0
           Top = 25
           Width = 416
-          Height = 195
+          Height = 186
           Margins.Left = 0
           Margins.Top = 25
           Margins.Right = 0
@@ -112,16 +115,19 @@ object fmMain: TfmMain
           OnDrawCell = sgTaskItemsDrawCell
           OnMouseDown = sgTasksMouseDown
           OnSelectCell = sgTaskItemsSelectCell
+          ExplicitHeight = 195
         end
       end
       object pConsole: TPanel
         Left = 0
-        Top = 220
+        Top = 211
         Width = 416
-        Height = 221
+        Height = 211
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 1
+        ExplicitTop = 220
+        ExplicitHeight = 221
         object lConsole: TLabel
           Left = 4
           Top = 4
@@ -134,7 +140,7 @@ object fmMain: TfmMain
           Left = 0
           Top = 25
           Width = 416
-          Height = 184
+          Height = 174
           Margins.Left = 0
           Margins.Top = 25
           Margins.Right = 0
@@ -143,14 +149,16 @@ object fmMain: TfmMain
           ReadOnly = True
           ScrollBars = ssBoth
           TabOrder = 0
+          ExplicitHeight = 184
         end
         object pbProgress: TProgressBar
           Left = 0
-          Top = 209
+          Top = 199
           Width = 416
           Height = 12
           Align = alBottom
           TabOrder = 1
+          ExplicitTop = 209
         end
       end
     end
@@ -158,10 +166,11 @@ object fmMain: TfmMain
       Left = 0
       Top = 0
       Width = 208
-      Height = 441
+      Height = 422
       Align = alClient
       BevelOuter = bvNone
       TabOrder = 0
+      ExplicitHeight = 441
       object lTasks: TLabel
         Left = 4
         Top = 4
@@ -174,7 +183,7 @@ object fmMain: TfmMain
         Left = 0
         Top = 25
         Width = 208
-        Height = 416
+        Height = 397
         Margins.Left = 0
         Margins.Top = 25
         Margins.Right = 0
@@ -191,8 +200,22 @@ object fmMain: TfmMain
         TabOrder = 0
         OnDblClick = sgTasksDblClick
         OnMouseDown = sgTasksMouseDown
+        ExplicitHeight = 416
       end
     end
+  end
+  object sbState: TStatusBar
+    Left = 0
+    Top = 422
+    Width = 624
+    Height = 19
+    Panels = <
+      item
+        Width = 50
+      end>
+    ExplicitLeft = 320
+    ExplicitTop = 232
+    ExplicitWidth = 0
   end
   object pmTasks: TPopupMenu
     OnPopup = pmTasksPopup

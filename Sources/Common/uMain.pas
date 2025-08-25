@@ -38,6 +38,7 @@ type
     miTerminate: TMenuItem;
     ilTaskItems: TImageList;
     pbProgress: TProgressBar;
+    sbState: TStatusBar;
 
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -62,6 +63,7 @@ type
     procedure RefreshTaskItemList;
     procedure RefreshTaskItem(_RecNo: Integer; _Item: TMKOTaskInstance);
     procedure RefreshConsole(_Instance: TMKOTaskInstance; _FullRefresh: Boolean);
+    procedure RefreshStatusBar;
     procedure Finalize;
     procedure StartTask;
     procedure TerminateTask;
@@ -156,6 +158,21 @@ begin
 
 end;
 
+procedure TfmMain.RefreshStatusBar;
+begin
+
+  with TaskServices.TaskInstances do
+
+    sbState.Panels[0].Text := Format(SC_TASK_SUMMARY, [
+
+        Count,
+        StateCount(SS_TASK_STARTED_STATES),
+        StateCount(tsFinished)
+
+    ]);
+
+end;
+
 procedure TfmMain.RefreshTaskItem(_RecNo: Integer; _Item: TMKOTaskInstance);
 begin
 
@@ -185,6 +202,8 @@ begin
     sgTaskItems.Refresh;
 
   end;
+
+  RefreshStatusBar;
 
 end;
 

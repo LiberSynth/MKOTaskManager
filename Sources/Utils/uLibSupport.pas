@@ -14,6 +14,14 @@ uses
 type
 
   TTaskState = (tsCreated, tsWaiting, tsProcessing, tsFinished, tsCanceled, tsError);
+  TTaskStates = set of TTaskState;
+
+const
+
+  SS_TASK_STARTED_STATES = [tsCreated, tsWaiting, tsProcessing];
+  SS_TASK_FINAL_STATES   = [tsFinished, tsCanceled, tsError];
+
+type
 
   TTaskStateHelper = record helper for TTaskState
 
@@ -124,8 +132,12 @@ type
 
   private
 
-    function StateCount(_State: TTaskState): Integer;
     function StateFind(_State: TTaskState; var _Instance: TMKOTaskInstance): Boolean;
+
+  public
+
+    function StateCount(_State: TTaskState): Integer; overload;
+    function StateCount(_States: TTaskStates): Integer; overload;
 
   end;
 
@@ -496,14 +508,12 @@ begin
 end;
 
 procedure TMKOTaskInstance.SetState(const _Value: TTaskState);
-const
-  SS_FINAL_STATES = [tsFinished, tsCanceled, tsError];
 begin
 
   StateLocker.Acquire;
   try
 
-    if FState in SS_FINAL_STATES then
+    if FState in SS_TASK_FINAL_STATES then
       Exit;
 
     FState := _Value;
@@ -593,6 +603,18 @@ begin
   Result := 0;
   for Item in Self do
     if Item.State = _State then
+      Inc(Result);
+
+end;
+
+function TMKOTaskInstanceList.StateCount(_States: TTaskStates): Integer;
+var
+  Item: TMKOTaskInstance;
+begin
+
+  Result := 0;
+  for Item in Self do
+    if Item.State in _States then
       Inc(Result);
 
 end;
