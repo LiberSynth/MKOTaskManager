@@ -181,7 +181,7 @@ object fmMain: TfmMain
         Margins.Right = 0
         Margins.Bottom = 0
         Align = alClient
-        ColCount = 2
+        ColCount = 3
         DefaultRowHeight = 20
         FixedCols = 0
         RowCount = 2

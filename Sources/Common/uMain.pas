@@ -296,7 +296,8 @@ begin
           Objects[0, RecNo] := MKOTask;
 
           Cells[0, RecNo] := MKOTask.Intf.Caption;
-          Cells[1, RecNo] := MKOTask.Intf.Description;
+          Cells[1, RecNo] := MKOTask.Intf.Name;
+          Cells[2, RecNo] := MKOTask.Intf.Description;
 
         end;
 
@@ -406,11 +407,13 @@ begin
   with sgTasks do
   begin
 
-    ColWidths[0] := 180;
-    ColWidths[1] := 500;
+    ColWidths[0] := 150;
+    ColWidths[1] := 120;
+    ColWidths[2] := 500;
 
     Cells[0, 0] := SC_TASKS_COLUMN_0_CAPTION;
     Cells[1, 0] := SC_TASKS_COLUMN_1_CAPTION;
+    Cells[2, 0] := SC_TASKS_COLUMN_2_CAPTION;
 
   end;
 

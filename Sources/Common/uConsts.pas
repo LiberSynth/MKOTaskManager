@@ -13,7 +13,8 @@ const
   SC_MESSAGE_BOX_ERROR_CAPTION = 'Ошибка';
 
   SC_TASKS_COLUMN_0_CAPTION = 'Задача';
-  SC_TASKS_COLUMN_1_CAPTION = 'Описание';
+  SC_TASKS_COLUMN_1_CAPTION = 'Имя';
+  SC_TASKS_COLUMN_2_CAPTION = 'Описание';
 
   SC_TASKS_ITEMS_COLUMN_1_CAPTION = 'Задача';
   SC_TASKS_ITEMS_COLUMN_2_CAPTION = 'Параметры';
