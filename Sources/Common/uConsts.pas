@@ -10,8 +10,9 @@ uses
 
 const
 
-  IC_MAXTHREAD_COUNT      = 10;
-  IC_MIN_POSTING_INTERVAL = 30;
+  IC_MAX_RUNNING_THREAD_COUNT = 10;
+  IC_MAX_DATA_PULLING_LENGTH  = 100;
+  IC_MIN_POSTING_INTERVAL     = 30;
 
   WM_TASK_INSTANCE_CHANGED = WM_USER + 1000;
   WM_TASK_SEND_DATA        = WM_USER + 1001;
@@ -37,10 +38,11 @@ const
   SC_TASKS_COLUMN_0_CAPTION = 'Задача';
   SC_TASKS_COLUMN_1_CAPTION = 'Описание';
 
-  SC_TASKS_ITEMS_COLUMN_0_CAPTION = 'Задача';
-  SC_TASKS_ITEMS_COLUMN_1_CAPTION = 'Параметры';
-  SC_TASKS_ITEMS_COLUMN_2_CAPTION = 'Состояние';
-  SC_TASKS_ITEMS_COLUMN_3_CAPTION = 'Создана';
+  SC_TASKS_ITEMS_COLUMN_1_CAPTION = 'Задача';
+  SC_TASKS_ITEMS_COLUMN_2_CAPTION = 'Параметры';
+  SC_TASKS_ITEMS_COLUMN_3_CAPTION = 'Состояние';
+  SC_TASKS_ITEMS_COLUMN_4_CAPTION = 'Создана';
+  SC_TASKS_ITEMS_COLUMN_5_CAPTION = 'Завершена';
 
   SC_TASK_NAME_UNIQUE_ERROR       = 'Задача с именем ''%s'' уже зарегистрирована. Укажите уникальное имя задачи.';
 

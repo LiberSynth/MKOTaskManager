@@ -45,7 +45,6 @@ object fmMain: TfmMain
         Value = 100.000000000000000000
       end>
     TabOrder = 0
-    ExplicitHeight = 441
     object pRightSide: TGridPanel
       Left = 208
       Top = 0
@@ -76,7 +75,6 @@ object fmMain: TfmMain
           Value = 50.000000000000000000
         end>
       TabOrder = 1
-      ExplicitHeight = 441
       object pRunning: TPanel
         Left = 0
         Top = 0
@@ -85,7 +83,6 @@ object fmMain: TfmMain
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 0
-        ExplicitHeight = 220
         object lRunning: TLabel
           Left = 4
           Top = 4
@@ -104,6 +101,7 @@ object fmMain: TfmMain
           Margins.Right = 0
           Margins.Bottom = 0
           Align = alClient
+          ColCount = 6
           DefaultRowHeight = 20
           FixedCols = 0
           RowCount = 2
@@ -115,7 +113,6 @@ object fmMain: TfmMain
           OnDrawCell = sgTaskItemsDrawCell
           OnMouseDown = sgTasksMouseDown
           OnSelectCell = sgTaskItemsSelectCell
-          ExplicitHeight = 195
         end
       end
       object pConsole: TPanel
@@ -126,8 +123,6 @@ object fmMain: TfmMain
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 1
-        ExplicitTop = 220
-        ExplicitHeight = 221
         object lConsole: TLabel
           Left = 4
           Top = 4
@@ -149,7 +144,6 @@ object fmMain: TfmMain
           ReadOnly = True
           ScrollBars = ssBoth
           TabOrder = 0
-          ExplicitHeight = 184
         end
         object pbProgress: TProgressBar
           Left = 0
@@ -158,7 +152,6 @@ object fmMain: TfmMain
           Height = 12
           Align = alBottom
           TabOrder = 1
-          ExplicitTop = 209
         end
       end
     end
@@ -170,7 +163,6 @@ object fmMain: TfmMain
       Align = alClient
       BevelOuter = bvNone
       TabOrder = 0
-      ExplicitHeight = 441
       object lTasks: TLabel
         Left = 4
         Top = 4
@@ -200,7 +192,6 @@ object fmMain: TfmMain
         TabOrder = 0
         OnDblClick = sgTasksDblClick
         OnMouseDown = sgTasksMouseDown
-        ExplicitHeight = 416
       end
     end
   end
@@ -213,9 +204,6 @@ object fmMain: TfmMain
       item
         Width = 50
       end>
-    ExplicitLeft = 320
-    ExplicitTop = 232
-    ExplicitWidth = 0
   end
   object pmTasks: TPopupMenu
     OnPopup = pmTasksPopup

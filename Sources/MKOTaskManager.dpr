@@ -7,14 +7,13 @@ uses
   uCommon in 'Common\uCommon.pas',
   uLibSupport in 'Utils\uLibSupport.pas',
   uUtils in 'Utils\uUtils.pas',
-  uFileExplorer in '..\..\MKOCommon\Utils\uFileExplorer.pas',
-  uInterfaces in '..\..\MKOCommon\TaskManager\uInterfaces.pas',
-  uTypes in '..\..\MKOCommon\TaskManager\uTypes.pas',
-  uGetTextForm in '..\..\MKOCommon\Utils\uGetTextForm.pas' {fmGetTextForm},
+  Common.uFileExplorer in '..\..\MKOCommon\Utils\Common.uFileExplorer.pas',
   Common.uConsts in '..\..\MKOCommon\Utils\Common.uConsts.pas',
+  Common.uTypes in '..\..\MKOCommon\TaskManager\Common.uTypes.pas',
+  Common.uInterfaces in '..\..\MKOCommon\TaskManager\Common.uInterfaces.pas',
+  Common.uGetTextForm in '..\..\MKOCommon\Utils\Common.uGetTextForm.pas' {fmGetTextForm},
   uThread in 'Common\uThread.pas',
-  Common.uUtils in '..\..\MKOCommon\Utils\Common.uUtils.pas',
-  uStringGridHelper in '..\..\MKOCommon\Utils\uStringGridHelper.pas';
+  Common.uUtils in '..\..\MKOCommon\Utils\Common.uUtils.pas';
 
 {$R *.res}
 

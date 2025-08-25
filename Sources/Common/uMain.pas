@@ -8,9 +8,9 @@ uses
   Vcl.ExtCtrls, Vcl.Grids, System.Math, Vcl.Menus, System.SysUtils, System.DateUtils,
   Winapi.Windows, Vcl.Graphics, System.ImageList, Vcl.ImgList, Winapi.Messages,
   { Common }
-  uStringGridHelper,
+  Common.uConsts, Common.uTypes, Common.uInterfaces, Common.uGetTextForm,
   { TM }
-  uConsts, uCommon, uLibSupport, uInterfaces, uTypes, uGetTextForm, uUtils, Common.uConsts;
+  uConsts, uCommon, uLibSupport, uUtils;
 
 type
 
@@ -61,24 +61,24 @@ type
     procedure AdjustSizes;
     procedure RefreshTasks;
     procedure RefreshTaskItemList;
-    procedure RefreshTaskItem(_RecNo: Integer; _Item: TMKOTaskInstance);
-    procedure RefreshConsole(_Instance: TMKOTaskInstance; _FullRefresh: Boolean);
+    procedure RefreshTaskItem(_RecNo: Integer; _Item: TMKOTaskItem);
+    procedure RefreshConsole(_Item: TMKOTaskItem; _FullRefresh: Boolean);
     procedure RefreshStatusBar;
     procedure Finalize;
     procedure StartTask;
     procedure TerminateTask;
     function InputTaskParams(_Task: TMKOTask; var _Params: IMKOTaskParams): Boolean;
 
-    procedure TaskInstanceListChanged;
-    procedure TaskInstanceChanged(_Instance: TMKOTaskInstance);
-    procedure TaskInstanceSendData(_Instance: TMKOTaskInstance);
+    procedure TaskItemListChanged;
+    procedure TaskItemChanged(_Item: TMKOTaskItem);
+    procedure TaskItemSendData(_Item: TMKOTaskItem);
     function TaskItemsRowChanged: Boolean;
-    function FindTaskItemIndex(_TaskItemObject: TObject; var _Row: Integer): Boolean;
     function TryGetCurrentTask(var _Value: TMKOTask): Boolean;
-    function FindTaskInstance(_Row: Integer; var _Value: TMKOTaskInstance): Boolean;
-    function TryGetCurrentTaskInstance(var _Value: TMKOTaskInstance): Boolean;
+    function FindTaskItemIndex(_ItemObject: TObject; var _Row: Integer): Boolean;
+    function FindTaskItem(_Row: Integer; var _Item: TMKOTaskItem): Boolean;
+    function TryGetCurrentTaskItem(var _Item: TMKOTaskItem): Boolean;
     procedure DrawIndicatorCell(_RecNo: Integer; _Rect: TRect);
-    function TaskInstanceStateImageIndex(_State: TTaskState): Integer;
+    function TaskStateImageIndex(_State: TTaskState): Integer;
     procedure ProcessShortCut(_ShortCut: TShortCut);
     function InputParamsDialogText(_Task: TMKOTask): String;
 
@@ -95,7 +95,7 @@ implementation
 
 procedure TfmMain.DrawIndicatorCell(_RecNo: Integer; _Rect: TRect);
 var
-  TaskInstance: TMKOTaskInstance;
+  Item: TMKOTaskItem;
   Index: Integer;
 begin
 
@@ -105,10 +105,10 @@ begin
     Brush.Color := clWhite;
     FillRect(_Rect);
 
-    if FindTaskInstance(_RecNo, TaskInstance) then
+    if FindTaskItem(_RecNo, Item) then
     begin
 
-      Index := TaskInstanceStateImageIndex(TaskInstance.State);
+      Index := TaskStateImageIndex(Item.State);
 
       _Rect.Offset(
 
@@ -124,7 +124,7 @@ begin
 
 end;
 
-procedure TfmMain.RefreshConsole(_Instance: TMKOTaskInstance; _FullRefresh: Boolean);
+procedure TfmMain.RefreshConsole(_Item: TMKOTaskItem; _FullRefresh: Boolean);
 var
   Progress: Integer;
 begin
@@ -142,7 +142,7 @@ begin
         а не в конце, потому что EM_LINESCROLL тоже заваливает очередь. И, наверное, нужно показывать
         ограниченную часть сообщений, а остальное сохранять в логи из потоков. А здесь добавить команду
         "Показать целиком" и делать ее доступной только после завершения задачи. И читать по ней весь лог. }
-      _Instance.PullData(Lines, Progress);
+      _Item.PullData(Lines, Progress);
 
       with pbProgress do
         if Position <> Progress then
@@ -152,8 +152,6 @@ begin
       UnlockDrawing;
     end;
 
-    SendMessage(Handle, EM_LINESCROLL, 0, Lines.Count);
-
   end;
 
 end;
@@ -161,7 +159,7 @@ end;
 procedure TfmMain.RefreshStatusBar;
 begin
 
-  with TaskServices.TaskInstances do
+  with TaskServices.TaskItems do
 
     sbState.Panels[0].Text := Format(SC_TASK_SUMMARY, [
 
@@ -173,7 +171,7 @@ begin
 
 end;
 
-procedure TfmMain.RefreshTaskItem(_RecNo: Integer; _Item: TMKOTaskInstance);
+procedure TfmMain.RefreshTaskItem(_RecNo: Integer; _Item: TMKOTaskItem);
 begin
 
   with sgTaskItems do
@@ -188,7 +186,10 @@ begin
         Cells[1, _RecNo] := _Item.Task.Intf.Caption;
         Cells[2, _RecNo] := _Item.Params.ToString;
         Cells[3, _RecNo] := _Item.State.ToString;
-        Cells[4, _RecNo] := _Item.Date.ToString;
+        if CompareDateTime(_Item.CreatePoint, 0) <> EqualsValue then
+          Cells[4, _RecNo] := _Item.CreatePoint.ToString;
+        if CompareDateTime(_Item.CompletePoint, 0) <> EqualsValue then
+          Cells[5, _RecNo] := _Item.CompletePoint.ToString;
 
       finally
         EndUpdate;
@@ -210,7 +211,7 @@ end;
 procedure TfmMain.RefreshTaskItemList;
 var
   RecNo: Integer;
-  Item: TMKOTaskInstance;
+  Item: TMKOTaskItem;
 begin
 
   with sgTaskItems do
@@ -224,11 +225,11 @@ begin
 
         { Обновляем весь набор, подобно перезапросу данных целиком. }
         RowCount := 1;
-        RowCount := Max(TaskServices.TaskInstances.Count + 1, 2);
+        RowCount := Max(TaskServices.TaskItems.Count + 1, 2);
         FixedRows := 1;
 
         RecNo := 0;
-        for Item in TaskServices.TaskInstances do
+        for Item in TaskServices.TaskItems do
         begin
 
           Inc(RecNo);
@@ -248,7 +249,7 @@ begin
 
   end;
 
-  if TryGetCurrentTaskInstance(Item) then
+  if TryGetCurrentTaskItem(Item) then
     RefreshConsole(Item, True);
 
 end;
@@ -300,31 +301,31 @@ begin
 
 end;
 
-function TfmMain.FindTaskInstance(_Row: Integer; var _Value: TMKOTaskInstance): Boolean;
+function TfmMain.FindTaskItem(_Row: Integer; var _Item: TMKOTaskItem): Boolean;
 var
-  TaskInstanceObject: TObject;
+  ItemObject: TObject;
 begin
 
   if _Row = 0 then
     Exit(False);
 
-  TaskInstanceObject := sgTaskItems.Objects[0, _Row];
+  ItemObject := sgTaskItems.Objects[0, _Row];
 
-  Result := Assigned(TaskInstanceObject);
+  Result := Assigned(ItemObject);
 
   if Result then
   begin
 
-    if not (TaskInstanceObject is TMKOTaskInstance) then
-      raise EMKOTMException.Create('The object associated with this list item is not TMKOTaskInstance.');
+    if not (ItemObject is TMKOTaskItem) then
+      raise EMKOTMException.Create('The object associated with this list item is not TMKOTaskItem.');
 
-    _Value := TMKOTaskInstance(TaskInstanceObject);
+    _Item := TMKOTaskItem(ItemObject);
 
   end;
 
 end;
 
-function TfmMain.FindTaskItemIndex(_TaskItemObject: TObject; var _Row: Integer): Boolean;
+function TfmMain.FindTaskItemIndex(_ItemObject: TObject; var _Row: Integer): Boolean;
 var
   i: Integer;
 begin
@@ -333,7 +334,7 @@ begin
 
     for i := 0 to RowCount - 1 do
 
-      if Objects[0, i] = _TaskItemObject then
+      if Objects[0, i] = _ItemObject then
       begin
 
         _Row := i;
@@ -367,9 +368,9 @@ end;
 procedure TfmMain.Init;
 begin
 
-  TaskServices.OnTaskInstanceListChanged := TaskInstanceListChanged;
-  TaskServices.OnTaskInstanceChanged := TaskInstanceChanged;
-  TaskServices.OnSendData := TaskInstanceSendData;
+  TaskServices.OnTaskInstanceListChanged := TaskItemListChanged;
+  TaskServices.OnTaskInstanceChanged := TaskItemChanged;
+  TaskServices.OnSendData := TaskItemSendData;
   InitGrids;
   AdjustSizes;
 
@@ -381,7 +382,7 @@ begin
   with sgTasks do
   begin
 
-    ColWidths[0] := 200;
+    ColWidths[0] := 180;
     ColWidths[1] := 500;
 
     Cells[0, 0] := SC_TASKS_COLUMN_0_CAPTION;
@@ -393,15 +394,17 @@ begin
   begin
 
     ColWidths[0] := DefaultRowHeight;
-    ColWidths[1] := 200;
+    ColWidths[1] := 180;
     ColWidths[2] := 300;
     ColWidths[3] := 85;
     ColWidths[4] := 110;
+    ColWidths[5] := 110;
 
-    Cells[1, 0] := SC_TASKS_ITEMS_COLUMN_0_CAPTION;
-    Cells[2, 0] := SC_TASKS_ITEMS_COLUMN_1_CAPTION;
-    Cells[3, 0] := SC_TASKS_ITEMS_COLUMN_2_CAPTION;
-    Cells[4, 0] := SC_TASKS_ITEMS_COLUMN_3_CAPTION;
+    Cells[1, 0] := SC_TASKS_ITEMS_COLUMN_1_CAPTION;
+    Cells[2, 0] := SC_TASKS_ITEMS_COLUMN_2_CAPTION;
+    Cells[3, 0] := SC_TASKS_ITEMS_COLUMN_3_CAPTION;
+    Cells[4, 0] := SC_TASKS_ITEMS_COLUMN_4_CAPTION;
+    Cells[5, 0] := SC_TASKS_ITEMS_COLUMN_5_CAPTION;
 
   end;
 
@@ -423,7 +426,7 @@ begin
 
   ParamString := '';
   {$IFDEF DEBUG}
-  ParamString := '12' + CRLF + 'C:\WorkMKO\_out\Win32\Debug\MKOTaskManager.exe';
+  ParamString := '1' + CRLF + 'D:\DATA\photos\2025-08-05\20250719_171756.mp4';
   {$ENDIF}
 
   Result := False;
@@ -473,7 +476,7 @@ end;
 
 procedure TfmMain.pmTaskItemsPopup(Sender: TObject);
 var
-  TaskItem: TMKOTaskInstance;
+  Item: TMKOTaskItem;
 begin
 
   with sgTaskItems do
@@ -481,8 +484,8 @@ begin
     miTerminate.Enabled :=
 
         (Row >= 1) and
-        TryGetCurrentTaskInstance(TaskItem) and
-        (TaskItem.State = tsProcessing);
+        TryGetCurrentTaskItem(Item) and
+        (Item.State = tsProcessing);
 
 end;
 
@@ -559,7 +562,7 @@ end;
 
 procedure TfmMain.sgTaskItemsSelectCell(Sender: TObject; ACol, ARow: LongInt; var CanSelect: Boolean);
 var
-  TaskInstance: TMKOTaskInstance;
+  Item: TMKOTaskItem;
 begin
 
   if
@@ -567,9 +570,9 @@ begin
       not sgTaskItems.IsUpdating and
       (ARow > 0) and
       TaskItemsRowChanged and
-      TryGetCurrentTaskInstance(TaskInstance)
+      TryGetCurrentTaskItem(Item)
 
-  then RefreshConsole(TaskInstance, True);
+  then RefreshConsole(Item, True);
 
 end;
 
@@ -607,36 +610,36 @@ begin
 
 end;
 
-procedure TfmMain.TaskInstanceChanged(_Instance: TMKOTaskInstance);
+procedure TfmMain.TaskItemChanged(_Item: TMKOTaskItem);
 var
   Row: Integer;
 begin
 
-  if FindTaskItemIndex(_Instance, Row) then
-    RefreshTaskItem(Row, _Instance);
+  if FindTaskItemIndex(_Item, Row) then
+    RefreshTaskItem(Row, _Item);
 
 end;
 
-procedure TfmMain.TaskInstanceSendData(_Instance: TMKOTaskInstance);
+procedure TfmMain.TaskItemSendData(_Item: TMKOTaskItem);
 var
   Row: Integer;
 begin
 
   if
 
-      FindTaskItemIndex(_Instance, Row) and
+      FindTaskItemIndex(_Item, Row) and
       (Row = sgTaskItems.Row)
 
-  then RefreshConsole(_Instance, False);
+  then RefreshConsole(_Item, False);
 
 end;
 
-procedure TfmMain.TaskInstanceListChanged;
+procedure TfmMain.TaskItemListChanged;
 begin
   RefreshTaskItemList;
 end;
 
-function TfmMain.TaskInstanceStateImageIndex(_State: TTaskState): Integer;
+function TfmMain.TaskStateImageIndex(_State: TTaskState): Integer;
 const
   AA_MAP: array[TTaskState] of Byte = (0, 1, 2, 3, 4, 5);
 begin
@@ -654,10 +657,10 @@ end;
 
 procedure TfmMain.TerminateTask;
 var
-  TaskInstance: TMKOTaskInstance;
+  Item: TMKOTaskItem;
 begin
-  if TryGetCurrentTaskInstance(TaskInstance) and (TaskInstance.State = tsProcessing) then
-    TaskInstance.Terminate;
+  if TryGetCurrentTaskItem(Item) and (Item.State = tsProcessing) then
+    Item.Terminate;
 end;
 
 function TfmMain.TryGetCurrentTask(var _Value: TMKOTask): Boolean;
@@ -678,7 +681,7 @@ begin
 
 end;
 
-function TfmMain.TryGetCurrentTaskInstance(var _Value: TMKOTaskInstance): Boolean;
+function TfmMain.TryGetCurrentTaskItem(var _Item: TMKOTaskItem): Boolean;
 begin
 
   with sgTaskItems do
@@ -687,10 +690,10 @@ begin
     Result :=
 
         (Row > 0) and
-        (Objects[0, Row] is TMKOTaskInstance);
+        (Objects[0, Row] is TMKOTaskItem);
 
     if Result then
-      _Value := TMKOTaskInstance(Objects[0, Row]);
+      _Item := TMKOTaskItem(Objects[0, Row]);
 
   end;
 

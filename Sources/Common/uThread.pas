@@ -5,8 +5,10 @@ interface
 uses
   { VCL }
   System.Classes, System.SysUtils,
+  { Common }
+  Common.uUtils, Common.uInterfaces,
   { TM }
-  Common.uUtils, uInterfaces, uConsts;
+  uConsts;
 
 type
 
@@ -76,13 +78,14 @@ var
   ErrorOccured: Boolean;
 begin
 
+  ErrorOccured := False;
+
   DoBeforeExecute;
   try
 
     try
 
       Intf.Execute(WiteOutIntf);
-      ErrorOccured := False;
 
     except
       {TODO 3 -oVasilevSM: Здесь нужно добавить оболочку для обработки исключений. }

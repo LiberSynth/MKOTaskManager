@@ -136,17 +136,16 @@
         <DCCReference Include="Common\uCommon.pas"/>
         <DCCReference Include="Utils\uLibSupport.pas"/>
         <DCCReference Include="Utils\uUtils.pas"/>
-        <DCCReference Include="..\..\MKOCommon\Utils\uFileExplorer.pas"/>
-        <DCCReference Include="..\..\MKOCommon\TaskManager\uInterfaces.pas"/>
-        <DCCReference Include="..\..\MKOCommon\TaskManager\uTypes.pas"/>
-        <DCCReference Include="..\..\MKOCommon\Utils\uGetTextForm.pas">
+        <DCCReference Include="..\..\MKOCommon\Utils\Common.uFileExplorer.pas"/>
+        <DCCReference Include="..\..\MKOCommon\Utils\Common.uConsts.pas"/>
+        <DCCReference Include="..\..\MKOCommon\TaskManager\Common.uTypes.pas"/>
+        <DCCReference Include="..\..\MKOCommon\TaskManager\Common.uInterfaces.pas"/>
+        <DCCReference Include="..\..\MKOCommon\Utils\Common.uGetTextForm.pas">
             <Form>fmGetTextForm</Form>
             <FormType>dfm</FormType>
         </DCCReference>
-        <DCCReference Include="..\..\MKOCommon\Utils\Common.uConsts.pas"/>
         <DCCReference Include="Common\uThread.pas"/>
         <DCCReference Include="..\..\MKOCommon\Utils\Common.uUtils.pas"/>
-        <DCCReference Include="..\..\MKOCommon\Utils\uStringGridHelper.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

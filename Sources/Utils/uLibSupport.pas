@@ -7,9 +7,9 @@ uses
   System.SysUtils, Generics.Collections, Winapi.Windows, System.SyncObjs, System.Classes,
   Winapi.Messages,
   { Common }
-  uInterfaces, uFileExplorer,
+  Common.uConsts, Common.uTypes, Common.uUtils, Common.uInterfaces, Common.uFileExplorer,
   { TM }
-  uUtils, uTypes, uThread, uConsts, Common.uUtils;
+  uUtils, uThread, uConsts;
 
 type
 
@@ -34,7 +34,7 @@ type
 
   TMKOTask = class;
 
-  TMKOTaskInstance = class
+  TMKOTaskItem = class
 
   strict private type
 
@@ -42,16 +42,16 @@ type
 
     strict private
 
-      FTaskInstance: TMKOTaskInstance;
+      FTaskItem: TMKOTaskItem;
 
       { IMKOTaskOutput }
       procedure WriteOut(const _Value: WideString; _Progress: Integer); safecall;
 
-      property TaskInstance: TMKOTaskInstance read FTaskInstance;
+      property TaskItem: TMKOTaskItem read FTaskItem;
 
     private
 
-      constructor Create(_TaskInstance: TMKOTaskInstance); reintroduce;
+      constructor Create(_Item: TMKOTaskItem); reintroduce;
 
     end;
 
@@ -63,12 +63,13 @@ type
     FParams: IMKOTaskParams;
     FWndHandle: HWND;
     FState: TTaskState;
-    FData: TStringList;
+    FData: String;
     FDataChanged: Boolean;
     FDataPosted: Boolean;
     FLastPostPoint: Cardinal;
     FProgress: Integer;
-    FDate: TDateTime;
+    FCreatePoint: TDateTime;
+    FCompletePoint: TDateTime;
     FStateLocker: TCriticalSection;
     FDataLocker: TCriticalSection;
 
@@ -88,7 +89,7 @@ type
     property StateLocker: TCriticalSection read FStateLocker;
     property DataLocker: TCriticalSection read FDataLocker;
     property WndHandle: HWND read FWndHandle;
-    property Data: TStringList read FData write FData;
+    property Data: String read FData write FData;
     property DataChanged: Boolean read FDataChanged;
     property DataPosted: Boolean read FDataPosted;
     property LastPostPoint: Cardinal read FLastPostPoint write FLastPostPoint;
@@ -118,7 +119,8 @@ type
 
     property Task: TMKOTask read FTask;
     property Params: IMKOTaskParams read FParams;
-    property Date: TDateTime read FDate;
+    property CreatePoint: TDateTime read FCreatePoint;
+    property CompletePoint: TDateTime read FCompletePoint;
 
     { Многопоточный метод }
     procedure PullData(_Target: TStrings; var _Progress: Integer);
@@ -128,11 +130,11 @@ type
 
   end;
 
-  TMKOTaskInstanceList = class(TList<TMKOTaskInstance>)
+  TMKOTaskItemList = class(TList<TMKOTaskItem>)
 
   private
 
-    function StateFind(_State: TTaskState; var _Instance: TMKOTaskInstance): Boolean;
+    function StateFind(_State: TTaskState; var _Item: TMKOTaskItem): Boolean;
 
   public
 
@@ -179,7 +181,7 @@ type
     constructor Create(const _Intf: IMKOTask); reintroduce;
 
     function ValidateParams(const _Params: IMKOTaskParams): Boolean;
-    function StartTask(const _Params: IMKOTaskParams): TMKOTaskInstance;
+    function StartTask(const _Params: IMKOTaskParams): TMKOTaskItem;
 
     property Intf: IMKOTask read FIntf;
 
@@ -249,7 +251,7 @@ type
   strict private type
 
     TTaskInstanceListChangedProc = procedure of object;
-    TOnTaskInstanceProc = procedure(_Instance: TMKOTaskInstance) of object;
+    TOnTaskInstanceProc = procedure(_Item: TMKOTaskItem) of object;
 
   strict private
 
@@ -262,7 +264,7 @@ type
 
     FWndHandle: HWND;
     FLibraries: TMKOLibraryList;
-    FTaskInstances: TMKOTaskInstanceList;
+    FTaskItems: TMKOTaskItemList;
     FOnTaskInstanceListChanged: TTaskInstanceListChangedProc;
     FOnTaskInstanceChanged: TOnTaskInstanceProc;
     FOnSendData: TOnTaskInstanceProc;
@@ -272,8 +274,8 @@ type
     procedure LoadLibrary(const _File: String);
     procedure MessageProc(var _Message: TMessage);
     procedure DoOnTaskInstanceListChanged;
-    procedure DoOnTaskInstanceChanged(_Instance: TMKOTaskInstance);
-    procedure DoOnSendData(_Instance: TMKOTaskInstance);
+    procedure DoOnTaskItemChanged(_Item: TMKOTaskItem);
+    procedure DoOnSendData(_Item: TMKOTaskItem);
 
     property WndHandle: HWND read FWndHandle;
 
@@ -289,7 +291,7 @@ type
 
     procedure CheckWaiting;
 
-    function AddTaskInstance(_MKOTask: TMKOTask; const _Params: IMKOTaskParams): TMKOTaskInstance;
+    function AddTaskInstance(_MKOTask: TMKOTask; const _Params: IMKOTaskParams): TMKOTaskItem;
 
   public
 
@@ -298,7 +300,7 @@ type
     procedure LoadLibraries;
 
     property Libraries: TMKOLibraryList read FLibraries;
-    property TaskInstances: TMKOTaskInstanceList read FTaskInstances;
+    property TaskItems: TMKOTaskItemList read FTaskItems;
     property TaskCount: Integer read GetTaskCount;
     property OnTaskInstanceListChanged: TTaskInstanceListChangedProc read FOnTaskInstanceListChanged write FOnTaskInstanceListChanged;
     property OnTaskInstanceChanged: TOnTaskInstanceProc read FOnTaskInstanceChanged write FOnTaskInstanceChanged;
@@ -353,27 +355,27 @@ begin
   Result := AA_MAP[Self];
 end;
 
-{ TMKOTaskInstance.TOutputIntf }
+{ TMKOTaskItem.TOutputIntf }
 
-constructor TMKOTaskInstance.TOutputIntf.Create(_TaskInstance: TMKOTaskInstance);
+constructor TMKOTaskItem.TOutputIntf.Create(_Item: TMKOTaskItem);
 begin
   inherited Create;
-  FTaskInstance := _TaskInstance;
+  FTaskItem := _Item;
 end;
 
-procedure TMKOTaskInstance.TOutputIntf.WriteOut(const _Value: WideString; _Progress: Integer);
+procedure TMKOTaskItem.TOutputIntf.WriteOut(const _Value: WideString; _Progress: Integer);
 begin
-  TaskInstance.WriteOut(_Value, _Progress);
+  TaskItem.WriteOut(_Value, _Progress);
 end;
 
-{ TMKOTaskInstance }
+{ TMKOTaskItem }
 
-function TMKOTaskInstance.CanStart: Boolean;
+function TMKOTaskItem.CanStart: Boolean;
 begin
-  Result := TaskServices.TaskInstances.StateCount(tsProcessing) < IC_MAXTHREAD_COUNT;
+  Result := TaskServices.TaskItems.StateCount(tsProcessing) < IC_MAX_RUNNING_THREAD_COUNT;
 end;
 
-constructor TMKOTaskInstance.Create;
+constructor TMKOTaskItem.Create;
 begin
 
   inherited Create;
@@ -381,11 +383,10 @@ begin
   FTask := _MKOTask;
   FParams := _Params;
   FWndHandle := _WndHandle;
-  FDate := Now;
+  FCreatePoint := Now;
 
   FStateLocker := TCriticalSection.Create;
   FDataLocker := TCriticalSection.Create;
-  FData := TStringList.Create;
 
   { Для вывода }
   State := tsCreated;
@@ -394,7 +395,7 @@ begin
 
 end;
 
-procedure TMKOTaskInstance.CreateThread;
+procedure TMKOTaskItem.CreateThread;
 begin
 
   FIntf := Task.Intf.StartTask(Params);
@@ -409,23 +410,22 @@ begin
 
 end;
 
-destructor TMKOTaskInstance.Destroy;
+destructor TMKOTaskItem.Destroy;
 begin
 
   FreeAndNil(FDataLocker);
   FreeAndNil(FStateLocker);
-  FreeAndNil(FData);
 
   inherited Destroy;
 
 end;
 
-procedure TMKOTaskInstance.DoChanged;
+procedure TMKOTaskItem.DoChanged;
 begin
   PostMessage(WndHandle, WM_TASK_INSTANCE_CHANGED, WPARAM(Self), 0);
 end;
 
-procedure TMKOTaskInstance.DoSendData(_Assured: Boolean);
+procedure TMKOTaskItem.DoSendData(_Assured: Boolean);
 var
   TC: Cardinal;
 begin
@@ -451,7 +451,7 @@ begin
 
 end;
 
-function TMKOTaskInstance.GetState: TTaskState;
+function TMKOTaskItem.GetState: TTaskState;
 begin
 
   StateLocker.Acquire;
@@ -465,36 +465,27 @@ begin
 
 end;
 
-procedure TMKOTaskInstance.PullData(_Target: TStrings; var _Progress: Integer);
-var
-  i: Integer;
+procedure TMKOTaskItem.PullData(_Target: TStrings; var _Progress: Integer);
 begin
 
   DataLocker.Acquire;
   try
 
-    if _Target.Count <> Data.Count then
-
     with _Target do
-    begin
 
-      BeginUpdate;
-      try
+      if Text.Length <> Data.Length then
+      begin
 
-        { Как ни странно, это быстрее работает. }
-        Text := Data.Text;
-        { Здесь предполагался такой цикл:
+        BeginUpdate;
+        try
 
-        for i := Count to Data.Count - 1 do
-          Add(Data[i]);
+          Text := Copy(Data, 1, IC_MAX_DATA_PULLING_LENGTH);
 
-          Но, он работает совсем медленно при большом количестве строк. }
+        finally
+          EndUpdate;
+        end;
 
-      finally
-        EndUpdate;
       end;
-
-    end;
 
     _Progress := Progress;
 
@@ -507,7 +498,7 @@ begin
 
 end;
 
-procedure TMKOTaskInstance.SetState(const _Value: TTaskState);
+procedure TMKOTaskItem.SetState(const _Value: TTaskState);
 begin
 
   StateLocker.Acquire;
@@ -522,17 +513,20 @@ begin
     StateLocker.Release;
   end;
 
+
+  if FState in SS_TASK_FINAL_STATES then
+    FCompletePoint := Now;
   DoChanged;
   WriteOut(State.Report, -1, True);
 
 end;
 
-procedure TMKOTaskInstance.StartThread;
+procedure TMKOTaskItem.StartThread;
 begin
   Thread.Start;
 end;
 
-procedure TMKOTaskInstance.Terminate;
+procedure TMKOTaskItem.Terminate;
 begin
 
   State := tsCanceled;
@@ -543,7 +537,7 @@ begin
 
 end;
 
-procedure TMKOTaskInstance.ThreadAfterExecute(_ErrorOccured: Boolean);
+procedure TMKOTaskItem.ThreadAfterExecute(_ErrorOccured: Boolean);
 const
   AC_MAP: array[Boolean] of TTaskState = (tsFinished, tsError);
 begin
@@ -553,17 +547,17 @@ begin
 
 end;
 
-procedure TMKOTaskInstance.ThreadBeforeExecute;
+procedure TMKOTaskItem.ThreadBeforeExecute;
 begin
   State := tsProcessing;
 end;
 
-procedure TMKOTaskInstance.ThreadOnTerminate(_Sender: TObject);
+procedure TMKOTaskItem.ThreadOnTerminate(_Sender: TObject);
 begin
   State := tsCanceled;
 end;
 
-procedure TMKOTaskInstance.WriteOut(const _Value: WideString; _Progress: Integer; _Assured: Boolean);
+procedure TMKOTaskItem.WriteOut(const _Value: WideString; _Progress: Integer; _Assured: Boolean);
 begin
 
   DataLocker.Acquire;
@@ -572,7 +566,7 @@ begin
     if Length(_Value) > 0 then
     begin
 
-      Data.Add(_Value);
+      Data := _Value + CRLF + Data;
       FDataChanged := True;
 
     end;
@@ -593,11 +587,11 @@ begin
 
 end;
 
-{ TMKOTaskInstanceList }
+{ TMKOTaskItemList }
 
-function TMKOTaskInstanceList.StateCount(_State: TTaskState): Integer;
+function TMKOTaskItemList.StateCount(_State: TTaskState): Integer;
 var
-  Item: TMKOTaskInstance;
+  Item: TMKOTaskItem;
 begin
 
   Result := 0;
@@ -607,9 +601,9 @@ begin
 
 end;
 
-function TMKOTaskInstanceList.StateCount(_States: TTaskStates): Integer;
+function TMKOTaskItemList.StateCount(_States: TTaskStates): Integer;
 var
-  Item: TMKOTaskInstance;
+  Item: TMKOTaskItem;
 begin
 
   Result := 0;
@@ -619,9 +613,9 @@ begin
 
 end;
 
-function TMKOTaskInstanceList.StateFind(_State: TTaskState; var _Instance: TMKOTaskInstance): Boolean;
+function TMKOTaskItemList.StateFind(_State: TTaskState; var _Item: TMKOTaskItem): Boolean;
 var
-  Item: TMKOTaskInstance;
+  Item: TMKOTaskItem;
 begin
 
   for Item in Self do
@@ -629,7 +623,7 @@ begin
     if Item.State = _State then
     begin
 
-      _Instance := Item;
+      _Item := Item;
       Exit(True);
 
     end;
@@ -709,7 +703,7 @@ begin
   FIntf := _Intf;
 end;
 
-function TMKOTask.StartTask(const _Params: IMKOTaskParams): TMKOTaskInstance;
+function TMKOTask.StartTask(const _Params: IMKOTaskParams): TMKOTaskItem;
 begin
   TrimParams(_Params);
   Result := TaskServices.AddTaskInstance(Self, _Params);
@@ -838,11 +832,11 @@ end;
 
 { TMKOTaskServices }
 
-function TMKOTaskServices.AddTaskInstance(_MKOTask: TMKOTask; const _Params: IMKOTaskParams): TMKOTaskInstance;
+function TMKOTaskServices.AddTaskInstance(_MKOTask: TMKOTask; const _Params: IMKOTaskParams): TMKOTaskItem;
 begin
 
-  Result := TMKOTaskInstance.Create(_MKOTask, _Params, WndHandle);
-  TaskInstances.Insert(0, Result);
+  Result := TMKOTaskItem.Create(_MKOTask, _Params, WndHandle);
+  TaskItems.Insert(0, Result);
 
   DoOnTaskInstanceListChanged;
 
@@ -853,9 +847,9 @@ begin
 
   inherited Create;
 
-  FWndHandle     := AllocateHWnd(MessageProc);
-  FLibraries     := TMKOLibraryList.Create;
-  FTaskInstances := TMKOTaskInstanceList.Create;
+  FWndHandle := AllocateHWnd(MessageProc);
+  FLibraries := TMKOLibraryList.Create;
+  FTaskItems := TMKOTaskItemList.Create;
 
 end;
 
@@ -865,7 +859,7 @@ begin
   FOnTaskInstanceListChanged := nil;
   FOnTaskInstanceChanged := nil;
 
-  FreeAndNil(FTaskInstances);
+  FreeAndNil(FTaskItems);
   FreeAndNil(FLibraries);
   DeallocateHWnd(FWndHandle);
 
@@ -873,16 +867,16 @@ begin
 
 end;
 
-procedure TMKOTaskServices.DoOnTaskInstanceChanged(_Instance: TMKOTaskInstance);
+procedure TMKOTaskServices.DoOnTaskItemChanged(_Item: TMKOTaskItem);
 begin
   if Assigned(FOnTaskInstanceChanged) then
-    OnTaskInstanceChanged(_Instance);
+    OnTaskInstanceChanged(_Item);
 end;
 
-procedure TMKOTaskServices.DoOnSendData(_Instance: TMKOTaskInstance);
+procedure TMKOTaskServices.DoOnSendData(_Item: TMKOTaskItem);
 begin
   if Assigned(FOnSendData) then
-    OnSendData(_Instance);
+    OnSendData(_Item);
 end;
 
 procedure TMKOTaskServices.DoOnTaskInstanceListChanged;
@@ -924,9 +918,9 @@ begin
 
   case _Message.Msg of
 
-    WM_TASK_INSTANCE_CHANGED: DoOnTaskInstanceChanged(TMKOTaskInstance(_Message.WParam));
+    WM_TASK_INSTANCE_CHANGED: DoOnTaskItemChanged(TMKOTaskItem(_Message.WParam));
     {TODO 1 -oVasilevSM : Нужно разделить отправку данных и прогресса на две разные обработки. }
-    WM_TASK_SEND_DATA:        DoOnSendData           (TMKOTaskInstance(_Message.WParam));
+    WM_TASK_SEND_DATA:        DoOnSendData       (TMKOTaskItem(_Message.WParam));
 
   end;
 
@@ -934,11 +928,11 @@ end;
 
 procedure TMKOTaskServices.CheckWaiting;
 var
-  TaskInstance: TMKOTaskInstance;
+  Item: TMKOTaskItem;
 begin
 
-  if TaskInstances.StateFind(tsWaiting, TaskInstance) then
-    TaskInstance.StartThread;
+  if TaskItems.StateFind(tsWaiting, Item) then
+    Item.StartThread;
 
 end;
 
@@ -986,10 +980,10 @@ var
   i: Integer;
 begin
 
-  for i := TaskInstances.Count - 1 downto 0 do
+  for i := TaskItems.Count - 1 downto 0 do
   begin
 
-    with TaskInstances[i] do
+    with TaskItems[i] do
     begin
 
       Terminate;
@@ -997,7 +991,7 @@ begin
 
     end;
 
-    TaskInstances.Delete(i);
+    TaskItems.Delete(i);
 
   end;
 
