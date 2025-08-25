@@ -11,11 +11,12 @@ uses
 const
 
   IC_MAX_RUNNING_THREAD_COUNT = 10;
-  IC_MAX_DATA_PULLING_LENGTH  = 100;
+  IC_MAX_DATA_PULLING_LENGTH  = 4000;
   IC_MIN_POSTING_INTERVAL     = 30;
 
   WM_TASK_INSTANCE_CHANGED = WM_USER + 1000;
   WM_TASK_SEND_DATA        = WM_USER + 1001;
+  WM_TASK_SEND_PROGRESS    = WM_USER + 1002;
 
   DC_GOLDEN_SECTION: Double = 1.618;
 
@@ -56,7 +57,8 @@ const
 
   SC_TASK_EXECUTE_ERROR_MESSAGE = 'При выполнении задачи возникло исключение %s: %s.';
 
-  SC_TASK_SUMMARY = 'Всего задач %d, запущено %d, успешно завершено %d.';
+  SC_TASK_COMPLETED_REPORT = 'Время выполнения: %s.';
+  SC_TASK_SUMMARY          = 'Всего задач %d, запущено %d, успешно завершено %d.';
 
 implementation
 

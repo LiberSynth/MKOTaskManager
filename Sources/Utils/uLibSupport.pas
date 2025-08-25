@@ -5,9 +5,10 @@ interface
 uses
   { VCL }
   System.SysUtils, Generics.Collections, Winapi.Windows, System.SyncObjs, System.Classes,
-  Winapi.Messages,
+  Winapi.Messages, System.DateUtils,
   { Common }
   Common.uConsts, Common.uTypes, Common.uUtils, Common.uInterfaces, Common.uFileExplorer,
+  Common.uFileUtils,
   { TM }
   uUtils, uThread, uConsts;
 
@@ -70,8 +71,10 @@ type
     FProgress: Integer;
     FCreatePoint: TDateTime;
     FCompletePoint: TDateTime;
+    FLogFile: String;
     FStateLocker: TCriticalSection;
     FDataLocker: TCriticalSection;
+    FProgressLocker: TCriticalSection;
 
     function GetState: TTaskState;
     procedure SetState(const _Value: TTaskState);
@@ -83,16 +86,19 @@ type
     function CanStart: Boolean;
     procedure DoChanged;
     procedure DoSendData(_Assured: Boolean);
+    procedure DoSendProgress;
+    procedure SaveToLog;
 
     property Intf: IMKOTaskInstance read FIntf;
     property Thread: TMKOTaskThread read FThread;
     property StateLocker: TCriticalSection read FStateLocker;
     property DataLocker: TCriticalSection read FDataLocker;
+    property ProgressLocker: TCriticalSection read FProgressLocker;
     property WndHandle: HWND read FWndHandle;
-    property Data: String read FData write FData;
     property DataChanged: Boolean read FDataChanged;
     property DataPosted: Boolean read FDataPosted;
     property LastPostPoint: Cardinal read FLastPostPoint write FLastPostPoint;
+    property LogFile: String read FLogFile;
 
   private
 
@@ -105,11 +111,10 @@ type
     ); reintroduce;
 
     procedure StartThread;
+    procedure CompleteTaskProcessing;
 
     { Многопоточный метод }
     procedure WriteOut(const _Value: WideString; _Progress: Integer; _Assured: Boolean = False);
-
-    property Progress: Integer read FProgress;
 
   public
 
@@ -122,8 +127,9 @@ type
     property CreatePoint: TDateTime read FCreatePoint;
     property CompletePoint: TDateTime read FCompletePoint;
 
-    { Многопоточный метод }
-    procedure PullData(_Target: TStrings; var _Progress: Integer);
+    { Многопоточные методы }
+    procedure PullData(var _Target: String);
+    procedure PullProgress(var _Progress: Integer);
 
     { Многопоточное свойство }
     property State: TTaskState read GetState write SetState;
@@ -268,6 +274,7 @@ type
     FOnTaskInstanceListChanged: TTaskInstanceListChangedProc;
     FOnTaskInstanceChanged: TOnTaskInstanceProc;
     FOnSendData: TOnTaskInstanceProc;
+    FOnSendProgress: TOnTaskInstanceProc;
 
     function GetTaskCount: Integer;
 
@@ -276,6 +283,7 @@ type
     procedure DoOnTaskInstanceListChanged;
     procedure DoOnTaskItemChanged(_Item: TMKOTaskItem);
     procedure DoOnSendData(_Item: TMKOTaskItem);
+    procedure DoOnSendProgress(_Item: TMKOTaskItem);
 
     property WndHandle: HWND read FWndHandle;
 
@@ -305,6 +313,7 @@ type
     property OnTaskInstanceListChanged: TTaskInstanceListChangedProc read FOnTaskInstanceListChanged write FOnTaskInstanceListChanged;
     property OnTaskInstanceChanged: TOnTaskInstanceProc read FOnTaskInstanceChanged write FOnTaskInstanceChanged;
     property OnSendData: TOnTaskInstanceProc read FOnSendData write FOnSendData;
+    property OnSendProgress: TOnTaskInstanceProc read FOnSendProgress write FOnSendProgress;
 
   end;
 
@@ -375,6 +384,21 @@ begin
   Result := TaskServices.TaskItems.StateCount(tsProcessing) < IC_MAX_RUNNING_THREAD_COUNT;
 end;
 
+procedure TMKOTaskItem.CompleteTaskProcessing;
+begin
+
+  FCompletePoint := Now;
+
+  WriteOut(Format(SC_TASK_COMPLETED_REPORT, [
+
+      TimeToStr(CompletePoint - CreatePoint)
+
+  ]), -1, True);
+
+  SaveToLog;
+
+end;
+
 constructor TMKOTaskItem.Create;
 begin
 
@@ -387,6 +411,7 @@ begin
 
   FStateLocker := TCriticalSection.Create;
   FDataLocker := TCriticalSection.Create;
+  FProgressLocker := TCriticalSection.Create;
 
   { Для вывода }
   State := tsCreated;
@@ -413,6 +438,7 @@ end;
 destructor TMKOTaskItem.Destroy;
 begin
 
+  FreeAndNil(FProgressLocker);
   FreeAndNil(FDataLocker);
   FreeAndNil(FStateLocker);
 
@@ -451,6 +477,11 @@ begin
 
 end;
 
+procedure TMKOTaskItem.DoSendProgress;
+begin
+  PostMessage(WndHandle, WM_TASK_SEND_PROGRESS, WPARAM(Self), 0);
+end;
+
 function TMKOTaskItem.GetState: TTaskState;
 begin
 
@@ -465,36 +496,59 @@ begin
 
 end;
 
-procedure TMKOTaskItem.PullData(_Target: TStrings; var _Progress: Integer);
+procedure TMKOTaskItem.PullData(var _Target: String);
 begin
 
   DataLocker.Acquire;
   try
 
-    with _Target do
+    if _Target.Length <> FData.Length then
+    begin
 
-      if Text.Length <> Data.Length then
-      begin
+      if (IC_MAX_DATA_PULLING_LENGTH = -1) or (State in SS_TASK_FINAL_STATES) then
+        _Target := FData
+      else
+        _Target := Copy(FData, 1, IC_MAX_DATA_PULLING_LENGTH);
 
-        BeginUpdate;
-        try
+    end;
 
-          Text := Copy(Data, 1, IC_MAX_DATA_PULLING_LENGTH);
-
-        finally
-          EndUpdate;
-        end;
-
-      end;
-
-    _Progress := Progress;
-
-    FDataChanged := False;
     FDataPosted := False;
+    FDataChanged := False;
 
   finally
     DataLocker.Release;
   end;
+
+end;
+
+procedure TMKOTaskItem.PullProgress(var _Progress: Integer);
+begin
+
+  ProgressLocker.Acquire;
+  try
+
+    _Progress := FProgress;
+
+  finally
+    ProgressLocker.Release;
+  end;
+
+end;
+
+procedure TMKOTaskItem.SaveToLog;
+const
+  SC_FORMAT = '%s\Logs\%s_%s.log';
+begin
+
+  FLogFile := UniqueFileName(Format(SC_FORMAT, [
+
+      ExeDir,
+      Task.Intf.Name,
+      FormatDateTime('yyyy-mm-dd hh-nn-ss-zzz', CompletePoint)
+
+  ]));
+
+  StrToFile(LogFile, FData);
 
 end;
 
@@ -513,11 +567,8 @@ begin
     StateLocker.Release;
   end;
 
-
-  if FState in SS_TASK_FINAL_STATES then
-    FCompletePoint := Now;
+  WriteOut(State.Report, -1);
   DoChanged;
-  WriteOut(State.Report, -1, True);
 
 end;
 
@@ -566,23 +617,30 @@ begin
     if Length(_Value) > 0 then
     begin
 
-      Data := _Value + CRLF + Data;
+      {TODO 1 -oVasilevSM : Тут очень долго. }
+      FData := _Value + CRLF + FData;
       FDataChanged := True;
+      DoSendData(_Assured);
 
     end;
-
-    if (_Progress <> -1) and (Progress <> _Progress) then
-    begin
-
-      FProgress := _Progress;
-      FDataChanged := True;
-
-    end;
-
-    DoSendData(_Assured);
 
   finally
     DataLocker.Release;
+  end;
+
+  ProgressLocker.Acquire;
+  try
+
+    if (_Progress <> -1) and (FProgress <> _Progress) then
+    begin
+
+      FProgress := _Progress;
+      DoSendProgress;
+
+    end;
+
+  finally
+    ProgressLocker.Release;
   end;
 
 end;
@@ -869,14 +927,26 @@ end;
 
 procedure TMKOTaskServices.DoOnTaskItemChanged(_Item: TMKOTaskItem);
 begin
+
+  with _Item do
+    if State in SS_TASK_FINAL_STATES then
+      CompleteTaskProcessing;
+
   if Assigned(FOnTaskInstanceChanged) then
     OnTaskInstanceChanged(_Item);
+
 end;
 
 procedure TMKOTaskServices.DoOnSendData(_Item: TMKOTaskItem);
 begin
   if Assigned(FOnSendData) then
     OnSendData(_Item);
+end;
+
+procedure TMKOTaskServices.DoOnSendProgress(_Item: TMKOTaskItem);
+begin
+  if Assigned(FOnSendProgress) then
+    OnSendProgress(_Item);
 end;
 
 procedure TMKOTaskServices.DoOnTaskInstanceListChanged;
@@ -919,8 +989,8 @@ begin
   case _Message.Msg of
 
     WM_TASK_INSTANCE_CHANGED: DoOnTaskItemChanged(TMKOTaskItem(_Message.WParam));
-    {TODO 1 -oVasilevSM : Нужно разделить отправку данных и прогресса на две разные обработки. }
     WM_TASK_SEND_DATA:        DoOnSendData       (TMKOTaskItem(_Message.WParam));
+    WM_TASK_SEND_PROGRESS:    DoOnSendProgress   (TMKOTaskItem(_Message.WParam));
 
   end;
 

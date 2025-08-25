@@ -146,6 +146,7 @@
         </DCCReference>
         <DCCReference Include="Common\uThread.pas"/>
         <DCCReference Include="..\..\MKOCommon\Utils\Common.uUtils.pas"/>
+        <DCCReference Include="..\..\MKOCommon\Utils\Common.uFileUtils.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

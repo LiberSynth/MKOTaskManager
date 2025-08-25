@@ -13,7 +13,8 @@ uses
   Common.uInterfaces in '..\..\MKOCommon\TaskManager\Common.uInterfaces.pas',
   Common.uGetTextForm in '..\..\MKOCommon\Utils\Common.uGetTextForm.pas' {fmGetTextForm},
   uThread in 'Common\uThread.pas',
-  Common.uUtils in '..\..\MKOCommon\Utils\Common.uUtils.pas';
+  Common.uUtils in '..\..\MKOCommon\Utils\Common.uUtils.pas',
+  Common.uFileUtils in '..\..\MKOCommon\Utils\Common.uFileUtils.pas';
 
 {$R *.res}
 

@@ -63,6 +63,7 @@ type
     procedure RefreshTaskItemList;
     procedure RefreshTaskItem(_RecNo: Integer; _Item: TMKOTaskItem);
     procedure RefreshConsole(_Item: TMKOTaskItem; _FullRefresh: Boolean);
+    procedure RefreshProgress(_Item: TMKOTaskItem);
     procedure RefreshStatusBar;
     procedure Finalize;
     procedure StartTask;
@@ -72,6 +73,7 @@ type
     procedure TaskItemListChanged;
     procedure TaskItemChanged(_Item: TMKOTaskItem);
     procedure TaskItemSendData(_Item: TMKOTaskItem);
+    procedure TaskItemSendProgress(_Item: TMKOTaskItem);
     function TaskItemsRowChanged: Boolean;
     function TryGetCurrentTask(var _Value: TMKOTask): Boolean;
     function FindTaskItemIndex(_ItemObject: TObject; var _Row: Integer): Boolean;
@@ -126,33 +128,47 @@ end;
 
 procedure TfmMain.RefreshConsole(_Item: TMKOTaskItem; _FullRefresh: Boolean);
 var
-  Progress: Integer;
+  Data: String;
 begin
 
-  with mConsole do
+  _Item.PullData(Data);
+
+  with mConsole, Lines do
   begin
 
     LockDrawing;
     try
 
-      if _FullRefresh then
-        Clear;
+      BeginUpdate;
+      try
 
-      {TODO 1 -oVasilevSM : Ќужно придумать что-то получше. ¬о-первых, последние сообщени€ сверху,
-        а не в конце, потому что EM_LINESCROLL тоже заваливает очередь. », наверное, нужно показывать
-        ограниченную часть сообщений, а остальное сохран€ть в логи из потоков. ј здесь добавить команду
-        "ѕоказать целиком" и делать ее доступной только после завершени€ задачи. » читать по ней весь лог. }
-      _Item.PullData(Lines, Progress);
+        if _FullRefresh then
+          Clear;
 
-      with pbProgress do
-        if Position <> Progress then
-          Position := Progress;
+        Text := Data;
+
+      finally
+        EndUpdate;
+      end;
 
     finally
       UnlockDrawing;
     end;
 
   end;
+
+end;
+
+procedure TfmMain.RefreshProgress(_Item: TMKOTaskItem);
+var
+  Progress: Integer;
+begin
+
+  _Item.PullProgress(Progress);
+
+  with pbProgress do
+    if Position <> Progress then
+      Position := Progress;
 
 end;
 
@@ -298,6 +314,7 @@ begin
   TaskServices.OnTaskInstanceListChanged := nil;
   TaskServices.OnTaskInstanceChanged := nil;
   TaskServices.OnSendData := nil;
+  TaskServices.OnSendProgress := nil;
 
 end;
 
@@ -368,9 +385,16 @@ end;
 procedure TfmMain.Init;
 begin
 
-  TaskServices.OnTaskInstanceListChanged := TaskItemListChanged;
-  TaskServices.OnTaskInstanceChanged := TaskItemChanged;
-  TaskServices.OnSendData := TaskItemSendData;
+  with TaskServices do
+  begin
+
+    OnTaskInstanceListChanged := TaskItemListChanged;
+    OnTaskInstanceChanged := TaskItemChanged;
+    OnSendData := TaskItemSendData;
+    OnSendProgress := TaskItemSendProgress;
+
+  end;
+
   InitGrids;
   AdjustSizes;
 
@@ -426,7 +450,7 @@ begin
 
   ParamString := '';
   {$IFDEF DEBUG}
-  ParamString := '1' + CRLF + 'D:\DATA\photos\2025-08-05\20250719_171756.mp4';
+  ParamString := '12' + CRLF + 'C:\WorkTP\Tillypad_EGAIS\_debugLanamar\TillypadEGAIS.exe';
   {$ENDIF}
 
   Result := False;
@@ -479,13 +503,10 @@ var
   Item: TMKOTaskItem;
 begin
 
-  with sgTaskItems do
+  miTerminate.Enabled :=
 
-    miTerminate.Enabled :=
-
-        (Row >= 1) and
-        TryGetCurrentTaskItem(Item) and
-        (Item.State = tsProcessing);
+      TryGetCurrentTaskItem(Item) and
+      (Item.State = tsProcessing);
 
 end;
 
@@ -493,14 +514,7 @@ procedure TfmMain.pmTasksPopup(Sender: TObject);
 var
   Task: TMKOTask;
 begin
-
-  with sgTaskItems do
-
-    miStart.Enabled :=
-
-        (Row >= 1) and
-        TryGetCurrentTask(Task);
-
+  miStart.Enabled := TryGetCurrentTask(Task);
 end;
 
 procedure TfmMain.ProcessShortCut(_ShortCut: TShortCut);
@@ -631,6 +645,20 @@ begin
       (Row = sgTaskItems.Row)
 
   then RefreshConsole(_Item, False);
+
+end;
+
+procedure TfmMain.TaskItemSendProgress(_Item: TMKOTaskItem);
+var
+  Row: Integer;
+begin
+
+  if
+
+      FindTaskItemIndex(_Item, Row) and
+      (Row = sgTaskItems.Row)
+
+  then RefreshProgress(_Item);
 
 end;
 
