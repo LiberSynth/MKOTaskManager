@@ -8,9 +8,9 @@ uses
   Vcl.ExtCtrls, Vcl.Grids, System.Math, Vcl.Menus, System.SysUtils, System.DateUtils,
   Winapi.Windows, Vcl.Graphics, System.ImageList, Vcl.ImgList, Winapi.Messages,
   { Common }
-  Common.uConsts, Common.uTypes, Common.uInterfaces, Common.uGetTextForm,
+  Common.uConsts, Common.uTypes, Common.uInterfaces, Common.uGetTextForm, Common.uLibSupport,
   { TM }
-  uConsts, uCommon, uLibSupport, uUtils;
+  uConsts, uCommon, uUtils;
 
 type
 
@@ -450,7 +450,7 @@ begin
 
   ParamString := '';
   {$IFDEF DEBUG}
-  ParamString := '12' + CRLF + 'C:\WorkTP\Tillypad_EGAIS\_debugLanamar\TillypadEGAIS.exe';
+  ParamString := '*.pas' + CRLF + 'C:\WorkTP';
   {$ENDIF}
 
   Result := False;

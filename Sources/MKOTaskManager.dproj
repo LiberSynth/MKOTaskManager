@@ -134,7 +134,7 @@
         </DCCReference>
         <DCCReference Include="Common\uConsts.pas"/>
         <DCCReference Include="Common\uCommon.pas"/>
-        <DCCReference Include="Utils\uLibSupport.pas"/>
+        <DCCReference Include="..\..\MKOCommon\LibSupport\Common.uLibSupport.pas"/>
         <DCCReference Include="Utils\uUtils.pas"/>
         <DCCReference Include="..\..\MKOCommon\Utils\Common.uFileExplorer.pas"/>
         <DCCReference Include="..\..\MKOCommon\Utils\Common.uConsts.pas"/>
@@ -144,7 +144,7 @@
             <Form>fmGetTextForm</Form>
             <FormType>dfm</FormType>
         </DCCReference>
-        <DCCReference Include="Common\uThread.pas"/>
+        <DCCReference Include="..\..\MKOCommon\LibSupport\Common.uTaskThread.pas"/>
         <DCCReference Include="..\..\MKOCommon\Utils\Common.uUtils.pas"/>
         <DCCReference Include="..\..\MKOCommon\Utils\Common.uFileUtils.pas"/>
         <BuildConfiguration Include="Base">
